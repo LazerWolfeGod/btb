@@ -1,4 +1,4 @@
-import pygame,math,random,sys,os,copy
+import pygame,math,random,sys,os,copy,requests
 import PyUI as pyui
 pygame.init()
 screenw = 800
@@ -24,22 +24,133 @@ def sectostr(sec):
     else:
         return f'{h}:{m}:{s}'
 
+def loadimage(url,name):
+    path = pyui.resourcepath(f'data\\images\\{name}.png')
+    if not os.path.isfile(path):
+        img_data = requests.get(url).content
+        with open(path, 'wb') as handler:
+            handler.write(img_data)
+    return path
+
+def songdatapull(data):
+    info = {}
+    info['album'] = data['album']['name']
+    info['name'] = data['name']
+    artists = [a['name'] for a in data['artists']]
+    artist = ''
+    for a in artists:
+        artist = artist+a+','
+    artist = artist.removesuffix(',')
+    info['artist'] = artist
+    info['length'] = data['duration_ms']/1000
+    info['image_url'] = data['album']['images'][0]['url']
+    return info
+
+def spotifyplaylistpull(link):
+    try:
+        import spotipy
+    except:
+        return 0
+    from spotipy.oauth2 import SpotifyClientCredentials
+    client_id = 'bbafafb36cc04da98d011939cf935c33'
+    client_secret = '4864d4b57ec44d20b4ef67607e810e51'
+    auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
+    sp = spotipy.Spotify(auth_manager=auth_manager)
+    data = sp.playlist(link)
+    songdata = []
+    for a in data['tracks']['items']:
+        songdata.append(songdatapull(a['track']))
+    files = []
+    for a in songdata:
+        files.append(makedat(a))
+    return [[readdat(a)['path'] for a in files],data['name']]
+    
+def makedat(info,overwrite=False):
+    if 'name' in info: name = info['name']
+    else: name = 'unknown'
+    if 'artist' in info: artist = info['artist']
+    else: artist = 'unknown'
+    if 'album' in info: album = info['album']
+    else: album = 'unknown'
+    if 'length' in info: length = info['length']
+    else: length = 0
+    if 'image_url' in info: image_url = info['image_url']
+    else: image_url = 'none'
+    if 'image_path' in info: image_path = info['image_path']
+    else:
+        if image_url == 'none':image_path = 'none'
+        else:
+            image_path = loadimage(image_url,album)
+    if 'path' in info: path = info['path']
+    else: path = pyui.resourcepath('data\\mp3\\'+name+'-'+artist+'.mp3')
+    if 'downloaded' in info: downloaded = info['downloaded']
+    else: downloaded = False
+    if path == 'none':file = f'data\\songs\\{name}-{artist}.dat'                                
+    else:
+        n = path.split('\\')[-1].removesuffix('.mp3')
+        file = pyui.resourcepath('data\\songs\\'+n+'.dat')
+    if not(os.path.isfile(file)) or overwrite:
+        with open(file,'w') as f:
+            f.write(f'name:{name}\n')
+            f.write(f'artist:{artist}\n')
+            f.write(f'album:{album}\n')
+            f.write(f'length:{length}\n')
+            f.write(f'image_path:{image_path}\n')
+            f.write(f'image_url:{image_url}\n')
+            f.write(f'path:{path}\n')
+            f.write(f'downloaded:{downloaded}\n')
+    return file
+
+def readdat(path):
+    with open(path,'r') as f:
+        data = f.readlines()
+    info = {}
+    for b in data:
+        b = b.removesuffix('\n')
+        split = b.split(':',1)
+        if split[1] == 'False': split[1] = False
+        elif split[1] == 'True': split[1] = True
+        info[split[0]] = split[1]
+    return info
+
+def makeplst(pl):
+    path = pyui.resourcepath(f'data\\playlists\\{pl[1]}.plst')
+    with open(path,'w') as f:
+        for a in pl[0]:
+            f.write(f'{a}\n')
+def readplst(title='',path=''):
+    if path == '':
+        path = pyui.resourcepath(f'data\\playlists\\{title}.plst')
+    if title == '':
+        title = path.split('\\')[-1].removesuffix('.plst')
+    pl = []
+    with open(path,'r') as f:
+        data = f.readlines()
+    for a in data:
+        pl.append(a.removesuffix('\n'))
+    return [pl,title]
+    
+
 class funcercm:
     def __init__(self,param,music):
         self.func = lambda: music.controlmenu(param)
 class funcerpl:
     def __init__(self,param,music):
         self.func = lambda: music.moveplaylist(param)
+class funceram:
+    def __init__(self,param,music):
+        self.func = lambda: music.addtoplaylist(param)
         
 class MUSIC:
     def __init__(self):
         self.shuffle = False
         self.playing = False
         self.storevolume = 1
+        self.songlength = 1
         
+        self.initfiles()
         self.loadmusic()
-        self.playlists = []
-        self.playlists.append([[self.allsongs[a] for a in range(len(self.allsongs))],'All Music'])
+        self.loadplaylists()
         self.activeplaylist = 0
         self.activesong = -1
         self.generatequeue()
@@ -47,35 +158,49 @@ class MUSIC:
         self.nextsong()
 
         self.makegui()
-        
-    def loadmusic(self):
-        files = [pyui.resourcepath('songs\\'+f) for f in os.listdir(pyui.resourcepath('songs')) if f[len(f)-4:]=='.mp3']
-        self.allsongs = [f for f in files]
-        self.songdata = []
-        for a in self.allsongs:
-            self.songdata.append({'path':a})
-            fl = a.removesuffix('.mp3')
-            name = fl.split('\\')[-1]
-            fl+='.dat'
+
+    def initfiles(self):
+        if not os.path.isdir(pyui.resourcepath('data')):
+            os.mkdir(pyui.resourcepath('data'))
+        if not os.path.isdir(pyui.resourcepath('data\\songs')):
+            os.mkdir(pyui.resourcepath('data\\songs'))
+        if not os.path.isdir(pyui.resourcepath('data\\mp3s')):
+            os.mkdir(pyui.resourcepath('data\\mp3s'))
+        if not os.path.isdir(pyui.resourcepath('data\\playlists')):
+            os.mkdir(pyui.resourcepath('data\\playlists'))
+        if not os.path.isdir(pyui.resourcepath('data\\images')):
+            os.mkdir(pyui.resourcepath('data\\images'))
+    def scanmp3s(self):
+        files = [pyui.resourcepath('data\\mp3s\\'+f) for f in os.listdir(pyui.resourcepath('data\\mp3s')) if f[len(f)-4:]=='.mp3']
+        for a in files:
+            fl = a.split('\\')[-1].removesuffix('.mp3')
+            name = fl
+            fl = pyui.resourcepath(fl+'.dat')
             if not os.path.isfile(fl):
                 songmp3 = pygame.mixer.Sound(a)
                 length = round(songmp3.get_length())
-                with open(fl,'w') as f:
-                    f.write(f'name:{name}\n')
-                    f.write(f'artist:unknown\n')
-                    f.write(f'length:{length}\n')
-            with open(fl,'r') as f:
-                data = f.readlines()
-            for b in data:
-                split = b.replace('\n',':').split(':')
-                self.songdata[-1][split[0]] = split[1]
+                makedat({'name':name,'length':length,'path':a,'downloaded':True})
+    def loadmusic(self):
+        self.scanmp3s()
+        files = [pyui.resourcepath('data\\songs\\'+f) for f in os.listdir(pyui.resourcepath('data\\songs')) if f[len(f)-4:]=='.dat']
+        self.songdata = []
+        self.allsongs = []
+        for file in files:
+            self.songdata.append(readdat(file))
+        for a in self.songdata:
+            self.allsongs.append(a['path'])
+    def loadplaylists(self):
+        self.playlists = []
+        self.playlists.append([[self.allsongs[a] for a in range(len(self.allsongs))],'All Music'])
+        files = [pyui.resourcepath('data\\playlists\\'+f) for f in os.listdir(pyui.resourcepath('data\\playlists')) if f[len(f)-5:]=='.plst']
+        for a in files:
+            self.playlists.append(readplst(path=a))
     def generatequeue(self):
         if not self.shuffle:
             if self.activesong == -1:
                 self.queue = copy.copy(self.playlists[self.activeplaylist][0])
             else:
                 self.queue = [self.playlists[self.activeplaylist][0][a] for a in range(self.playlists[self.activeplaylist][0].index(self.activesong),len(self.playlists[self.activeplaylist][0]))]
-
     def nextsong(self):
         pygame.mixer.music.unload()
         self.missedtime = 0
@@ -85,16 +210,20 @@ class MUSIC:
         if len(self.queue)!=0:
             self.activesong = self.queue[0]
             del self.queue[0]
-            pygame.mixer.music.load(self.activesong)
-            songmp3 = pygame.mixer.Sound(self.activesong)
-            self.songlength = round(songmp3.get_length())
-            self.refreshsongdisplays()
-            
-
-            pygame.mixer.music.set_endevent(pygame.USEREVENT)
-            pygame.mixer.music.play()
-            if not self.playing:
-                pygame.mixer.music.pause()
+            while len(self.queue)>0 and not(self.songdata[self.allsongs.index(self.activesong)]['downloaded']):
+                self.activesong = self.queue[0]
+                del self.queue[0]
+            if self.songdata[self.allsongs.index(self.activesong)]['downloaded']:
+                pygame.mixer.music.load(self.activesong)
+                songmp3 = pygame.mixer.Sound(self.activesong)
+                self.songlength = round(songmp3.get_length())
+                self.refreshsongdisplays()
+                pygame.mixer.music.set_endevent(pygame.USEREVENT)
+                pygame.mixer.music.play()
+                if not self.playing:
+                    pygame.mixer.music.pause()
+            else:
+                self.activesong = -1
         else:
             self.activesong = -1
     def prevsong(self):
@@ -110,7 +239,7 @@ class MUSIC:
                 ui.IDs['songtime'].refresh(ui)
                 ui.IDs['songtime'].resetcords(ui)
     def refreshsongdisplays(self):
-        if 'songlength' in ui.IDs:
+        if self.activesong != -1 and 'song duration' in ui.IDs:
             ui.IDs['song duration'].maxp = self.songlength
             ui.IDs['songlength'].text = sectostr(self.songlength)
             ui.IDs['songlength'].refresh(ui)
@@ -121,6 +250,12 @@ class MUSIC:
             ui.IDs['artist name'].text = self.songdata[self.allsongs.index(self.activesong)]['artist']
             ui.IDs['artist name'].refresh(ui)
             ui.IDs['artist name'].resetcords(ui)
+            if self.songdata[self.allsongs.index(self.activesong)]['image_path'] != 'none':
+                ui.IDs['song img'].img = pygame.image.load(self.songdata[self.allsongs.index(self.activesong)]['image_path'])
+            else:
+                ui.IDs['song img'].img = pyui.loadinganimation(12)
+            ui.IDs['song img'].refresh(ui)
+            ui.IDs['song img'].resetcords(ui)
             
     def makegui(self):
         self.songbarwidth = 0.4
@@ -140,40 +275,50 @@ class MUSIC:
         ui.makebutton(0,0,'{speaker}',20,anchor=('w-120','h-46'),objanchor=('w','h/2'),roundedcorners=10,scalesize=False,clickdownsize=2,spacing=4,toggleable=True,togglecol=(16,163,127),toggletext='{mute}',command=self.mutetoggle,ID='mute button',layer=5)
 
         ## song title/image
-        ui.maketext(0,0,'',70,anchor=('50','h-46'),center=True,scalesize=False,img=pyui.loadinganimation(12),ID='img',layer=5)
+        ui.maketext(0,0,'',70,anchor=('50','h-46'),center=True,scalesize=False,img=pyui.loadinganimation(12),ID='song img',layer=5)
         ui.maketext(0,0,'Song',20,anchor=('90','h-45'),objanchor=(0,'h'),backingcol=(32,33,35),maxwidth=200,textcenter=False,scalesize=False,ID='song title',layer=5)
         ui.maketext(0,0,'Artist',15,anchor=('90','h-45'),backingcol=(32,33,35),maxwidth=200,textcol=(220,220,220),scalesize=False,ID='artist name',layer=5)  
         
         ## playlist
         titles = [ui.maketext(0,0,'Image',30,textcenter=True,col=(62,63,75)),
                   ui.maketext(0,0,'Song',30,textcenter=True,col=(62,63,75)),
-                  ui.maketext(0,0,'Artist',30,textcenter=True,col=(62,63,75)),
+                  ui.maketext(0,0,'Album',30,textcenter=True,col=(62,63,75)),
                   ui.maketext(0,0,'Length',30,textcenter=True,col=(62,63,75)),'']
-        ui.maketable(160,100,[],titles,ID='playlist',boxwidth=[80,150,120,80],boxheight=[40],backingdraw=True,textsize=20,verticalspacing=4,textcenter=False,col=(62,63,75),scalesize=False,scalex=False,scaley=False,roundedcorners=4)
+        wid = int((screenw-315-12)/3)
+        ui.maketable(160,100,[],titles,ID='playlist',boxwidth=[70,wid,wid,wid,70],boxheight=[40],backingdraw=True,textsize=20,verticalspacing=4,textcenter=False,col=(62,63,75),scalesize=False,scalex=False,scaley=False,roundedcorners=4)
         self.refreshsongtable()
-        ui.maketext(0,5,self.playlists[self.activeplaylist][1],80,anchor=(160+ui.IDs['playlist'].width/2,0),center=True,centery=False,scalesize=False,scalex=False,scaley=False,ID='playlist name')
-        ui.maketext(0,65,str(len(self.playlists[self.activeplaylist][0]))+' songs',30,anchor=(160+ui.IDs['playlist'].width/2,0),center=True,centery=False,scalesize=False,scalex=False,scaley=False,ID='playlist info')
-
+        ui.makerect(156,0,2000,100,col=(62,63,75),scalesize=False,scalex=False,scaley=False,layer=2)
+        ui.maketext(0,5,self.playlists[self.activeplaylist][1],80,anchor=('(w-175)/2+160',0),center=True,centery=False,scalesize=False,scalex=False,scaley=False,ID='playlist name',layer=3)
+        ui.maketext(0,65,str(len(self.playlists[self.activeplaylist][0]))+' songs',30,anchor=('(w-175)/2+160',0),center=True,centery=False,scalesize=False,scalex=False,scaley=False,ID='playlist info',layer=3)
+        ui.makescroller(0,0,screenh-193,self.shiftsongtable,maxp=ui.IDs['playlist'].height,pageheight=screenh-200,anchor=('w',100),objanchor=('w',0),ID='scroller',scalesize=False,scalex=False,scaley=False,runcommandat=1)
+            
         ## side bar
         ui.makerect(150,0,4,1000,layer=2,scalesize=False,scalex=False,scaley=False)
         ui.maketext(75,30,'Playlists',40,center=True,scalesize=False,scalex=False,scaley=False)
-        ui.makebutton(10,50,'+',55,roundedcorners=30,width=35,height=35,textoffsety=-3,scalesize=False,scalex=False,scaley=False,command=self.makeplaylist)
+        ui.makebutton(12,50,'+',55,roundedcorners=30,width=35,height=35,textoffsety=-3,scalesize=False,scalex=False,scaley=False,command=self.makeplaylist)
+        ui.makebutton(50,50,'Import',32,roundedcorners=30,height=35,scalesize=False,scalex=False,scaley=False,command=self.importplaylist)
         ui.maketable(10,95,[['']],roundedcorners=4,textsize=20,boxwidth=130,scalesize=False,scalex=False,scaley=False,verticalspacing=3,ID='playlist table')
         self.refreshplaylisttable()
         
         ## control menu
-        ui.makewindowedmenu(0,0,100,140,'control','main',col=(52,53,65),scalesize=False,scalex=False,scaley=False,roundedcorners=10,ID='controlmenu')
+        ui.makewindowedmenu(0,0,100,230,'control','main',col=(52,53,65),scalesize=False,scalex=False,scaley=False,roundedcorners=10,ID='controlmenu')
         ui.makebutton(5,5,'Play',30,col=(62,63,75),textcol=(240,240,240),roundedcorners=8,width=90,height=40,menu='control',command=self.playselected,scalesize=False,scalex=False,scaley=False)
         ui.makebutton(5,50,'Queue',30,col=(62,63,75),textcol=(240,240,240),roundedcorners=8,width=90,height=40,menu='control',command=self.queueselected,scalesize=False,scalex=False,scaley=False)
         ui.makebutton(5,95,'Info',30,col=(62,63,75),textcol=(240,240,240),roundedcorners=8,width=90,height=40,menu='control',command=self.infomenu,scalesize=False,scalex=False,scaley=False)
+        ui.makebutton(5,140,'Add',30,col=(62,63,75),textcol=(240,240,240),roundedcorners=8,width=90,height=40,menu='control',command=self.addmenu,scalesize=False,scalex=False,scaley=False)
+        ui.makebutton(5,185,'Remove',30,col=(62,63,75),textcol=(240,240,240),roundedcorners=8,width=90,height=40,menu='control',command=self.removesong,scalesize=False,scalex=False,scaley=False)
 
+        ## add menu
+        ui.makewindowedmenu(160,20,200,255,'add menu','main',col=(52,53,65),scalesize=False,scalex=False,scaley=False,roundedcorners=10,colorkey=(2,2,2),ID='add menu')
+        ui.maketable(5,5,[],['Playlist'],menu='add menu',roundedcorners=4,boxwidth=190,textsize=30,scalesize=False,scalex=False,scaley=False,verticalspacing=3,col=(62,63,75),ID='playlist add')
+        
         ## info editor
-        ui.makewindowedmenu(160,20,400,156,'song info','main',col=(52,53,65),scalesize=False,scalex=False,scaley=False,roundedcorners=10,colorkey=(2,2,2))
-        ui.maketable(5,5,[['Name',ui.maketextbox(0,0,'',200,2,roundedcorners=2,textsize=30,col=(62,63,75),ID='inputinfo name')],
-                          ['Artist',ui.maketextbox(0,0,'',200,2,roundedcorners=2,textsize=30,col=(62,63,75),ID='inputinfo artist')],
-                          ['Image',ui.maketextbox(0,0,'',200,2,roundedcorners=2,textsize=30,col=(62,63,75),ID='inputinfo image')],
-                          ['File',ui.maketext(0,0,'',30,roundedcorners=2,col=(62,63,75),ID='inputinfo file')]],boxwidth=[-1,300],menu='song info',roundedcorners=4,textsize=30,scalesize=False,scalex=False,scaley=False,verticalspacing=3,col=(62,63,75))
-        ui.makebutton(200,138,'Save',30,self.saveinfo,'song info',roundedcorners=8,spacing=2,horizontalspacing=14,center=True,clickdownsize=2)
+        ui.makewindowedmenu(160,20,600,255,'song info','main',col=(52,53,65),scalesize=False,scalex=False,scaley=False,roundedcorners=10,colorkey=(2,2,2))
+        ui.maketable(5,5,[['Name',ui.maketextbox(0,0,'',400,10,height=50,roundedcorners=2,textsize=30,col=(62,63,75),ID='inputinfo name',linelimit=10)],
+                          ['Artist',ui.maketextbox(0,0,'',400,10,height=50,roundedcorners=2,textsize=30,col=(62,63,75),ID='inputinfo artist',linelimit=10)],
+                          ['Album',ui.maketextbox(0,0,'',400,10,height=50,roundedcorners=2,textsize=30,col=(62,63,75),ID='inputinfo album',linelimit=10)],
+                          ['Image',ui.maketextbox(0,0,'',400,10,height=50,roundedcorners=2,textsize=30,col=(62,63,75),ID='inputinfo image',linelimit=10)]],boxwidth=[-1,500],boxheight=50,menu='song info',roundedcorners=4,textsize=30,scalesize=False,scalex=False,scaley=False,verticalspacing=3,col=(62,63,75))
+        ui.makebutton(300,220,'Save',30,self.saveinfo,'song info',roundedcorners=8,spacing=2,horizontalspacing=14,center=True,centery=False,clickdownsize=2,scalesize=False,scalex=False,scaley=False)
         self.refreshsongdisplays()
     def setsongtime(self):
         if ui.IDs['song duration button'].clickedon == 2 and self.activesong!=-1:
@@ -199,6 +344,9 @@ class MUSIC:
             pygame.mixer.music.unpause()
         else:
             pygame.mixer.music.pause()
+    def shiftsongtable(self):
+        ui.IDs['playlist'].y = 100-ui.IDs['scroller'].scroll
+        ui.IDs['playlist'].refreshcords(ui)
     def refreshsongtable(self):
         ui.IDs['playlist'].wipe(ui,False)
         data = []
@@ -206,7 +354,9 @@ class MUSIC:
             func = funcercm(a,self)
             obj = ui.makebutton(0,0,'{dots}',20,command=func.func,col=(62,63,75),clickdownsize=1,roundedcorners=4)
             dat = self.songdata[self.allsongs.index(a)]
-            data.append(['-',dat['name'],dat['artist'],sectostr(float(dat['length'])),obj])
+            if dat['image_path'] == 'none': img = '-'
+            else: img = ui.maketext(0,0,'',64,img=pygame.image.load(dat['image_path']),col=(62,63,75),roundedcorners=4,textcenter=True,scalesize=False)
+            data.append([img,dat['name']+'\n- '+dat['artist'],dat['album'],sectostr(float(dat['length'])),obj])
         ui.IDs['playlist'].data = data
         ui.IDs['playlist'].refresh(ui)
         ui.IDs['playlist'].refreshcords(ui)
@@ -219,11 +369,23 @@ class MUSIC:
         ui.IDs['playlist table'].data = data
         ui.IDs['playlist table'].refresh(ui)
         ui.IDs['playlist table'].refreshcords(ui)
+    def importplaylist(self):
+        link = 'https://open.spotify.com/playlist/5B75Nl5U8eEpp7MUGzeOHt?si=197f49230b604cef'
+        pl = spotifyplaylistpull(link)
+        self.loadmusic()
+        self.playlists.append(pl)
+        makeplst(pl)
+        self.moveplaylist(len(self.playlists)-1)
+        self.refreshplaylisttable()
+        
     def makeplaylist(self):
-        self.playlists.append([[],'New Playlist'])
+        self.playlists.append([[],'New Playlist '+str(len(self.playlists)+1)])
+        makeplst([[],'New Playlist '+str(len(self.playlists))])
         self.moveplaylist(len(self.playlists)-1)
         self.refreshplaylisttable()
     def moveplaylist(self,playlist):
+        ui.IDs['scroller'].scroll = 0
+        self.shiftsongtable()
         self.activeplaylist = playlist
         self.refreshsongtable()
         ui.IDs['playlist name'].text = self.playlists[self.activeplaylist][1]
@@ -232,36 +394,69 @@ class MUSIC:
         ui.IDs['playlist info'].text = str(len(self.playlists[self.activeplaylist][0]))+' songs'
         ui.IDs['playlist info'].refresh(ui)
         ui.IDs['playlist info'].resetcords(ui)
-        
+        ui.IDs['scroller'].scroller = 0
+        ui.IDs['scroller'].maxp = ui.IDs['playlist'].height
+        ui.IDs['scroller'].refresh(ui)
+    def addtoplaylist(self,playlist):
+        self.playlists[[a[1] for a in self.playlists].index(playlist)][0].append(self.selected)
+        makeplst(self.playlists[[a[1] for a in self.playlists].index(playlist)])
+        ui.menuback()
+    def removesong(self):
+        ui.menuback()
+        if self.activeplaylist != 0:
+            self.playlists[self.activeplaylist][0].remove(self.selected)
+            makeplst(self.playlists[self.activeplaylist])
+            self.refreshsongtable()
     def controlmenu(self,song):
         self.selected = song
         mpos = pygame.mouse.get_pos()
-        ui.IDs['controlmenu'].x = mpos[0]
-        ui.IDs['controlmenu'].y = mpos[1]
+        if screenw-mpos[0]<ui.IDs['controlmenu'].width: wid = ui.IDs['controlmenu'].width
+        else: wid = 0
+        if screenh-mpos[1]-100<ui.IDs['controlmenu'].height: hei = ui.IDs['controlmenu'].height
+        else: hei = 0
+        ui.IDs['controlmenu'].x = mpos[0]-wid
+        ui.IDs['controlmenu'].y = mpos[1]-hei
         ui.IDs['controlmenu'].startanchor = mpos
         ui.movemenu('control','down')
     def infomenu(self):
         dat = self.songdata[self.allsongs.index(self.selected)]
         ui.IDs['inputinfo name'].text = dat['name']
         ui.IDs['inputinfo artist'].text = dat['artist']
-        ui.IDs['inputinfo file'].text = self.selected.removeprefix(os.getcwd())
+        ui.IDs['inputinfo album'].text = dat['album']
+        ui.IDs['inputinfo image'].text = dat['image_path']
         ui.IDs['inputinfo name'].refresh(ui)
         ui.IDs['inputinfo artist'].refresh(ui)
-        ui.IDs['inputinfo file'].refresh(ui)
+        ui.IDs['inputinfo album'].refresh(ui)
+        ui.IDs['inputinfo image'].refresh(ui)
         ui.movemenu('song info','down')
+    def addmenu(self):
+        data = []
+        for a in range(1,len(self.playlists)):
+            func = funceram(self.playlists[a][1],self)
+            data.append([ui.makebutton(0,0,self.playlists[a][1],25,clickdownsize=1,roundedcorners=4,verticalspacing=4,command=func.func)])
+        ui.IDs['playlist add'].data = data
+        ui.IDs['playlist add'].refresh(ui)
+        ui.IDs['playlist add'].refreshcords(ui)
+        ui.IDs['add menu'].height = ui.IDs['playlist add'].height+10
+        ui.movemenu('add menu','down')
     def saveinfo(self):
         name = ui.IDs['inputinfo name'].text
         artist = ui.IDs['inputinfo artist'].text
+        album = ui.IDs['inputinfo album'].text
+        image = ui.IDs['inputinfo image'].text
+        if len(image.split('\\')) == 1:
+            image = pyui.resourcepath(f'data\\images\\{image}')
         self.songdata[self.allsongs.index(self.selected)]['name'] = name
         self.songdata[self.allsongs.index(self.selected)]['artist'] = artist
+        self.songdata[self.allsongs.index(self.selected)]['album'] = album
+        if os.path.isfile(image):
+            self.songdata[self.allsongs.index(self.selected)]['image_path'] = image
         length = self.songdata[self.allsongs.index(self.selected)]['length']
         fl = self.selected.removesuffix('.mp3')
         fl+='.dat'
-        with open(fl,'w') as f:
-            f.write(f'name:{name}\n')
-            f.write(f'artist:{artist}\n')
-            f.write(f'length:{length}\n')
+        makedat(self.songdata[self.allsongs.index(self.selected)],True)
         self.refreshsongtable()
+        ui.menuback()
         
     def playselected(self):
         self.activesong = self.selected
@@ -290,6 +485,13 @@ while not done:
             ui.IDs['controlbar'].width = screenw
             ui.IDs['song duration'].width = event.w*music.songbarwidth
             ui.IDs['song duration'].resetcords(ui)
+            ui.IDs['scroller'].height = screenh-193
+            ui.IDs['scroller'].pageheight = screenh-200
+            ui.IDs['scroller'].refresh(ui)
+            wid = int((screenw-315-12)/3)
+            ui.IDs['playlist'].boxwidth = [70,wid,wid,wid,70]
+            ui.IDs['playlist'].refresh(ui)
+            ui.IDs['playlist'].refreshcords(ui)
         if event.type == pygame.mixer.music.get_endevent():
             music.nextsong()
         if event.type == pygame.KEYDOWN:
