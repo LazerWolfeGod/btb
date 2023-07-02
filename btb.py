@@ -1,4 +1,4 @@
-import pygame,math,random,sys,os,copy,requests
+import pygame,math,random,sys,os,copy,requests,threading
 import PyUI as pyui
 pygame.init()
 screenw = 800
@@ -23,6 +23,12 @@ def sectostr(sec):
         return f'{m}:{s}'
     else:
         return f'{h}:{m}:{s}'
+
+def makefileable(name):
+    special = '\/:*?"<>|'
+    for a in special:
+        name = name.replace(a,'')
+    return name
 
 def loadimage(url,name):
     path = pyui.resourcepath(f'data\\images\\{name}.png')
@@ -56,7 +62,11 @@ def spotifyplaylistpull(link):
     client_secret = '4864d4b57ec44d20b4ef67607e810e51'
     auth_manager = SpotifyClientCredentials(client_id=client_id, client_secret=client_secret)
     sp = spotipy.Spotify(auth_manager=auth_manager)
-    data = sp.playlist(link)
+    try:
+        data = sp.playlist(link)
+    except:
+        print('invalid link')
+        return 0
     songdata = []
     for a in data['tracks']['items']:
         songdata.append(songdatapull(a['track']))
@@ -64,13 +74,13 @@ def spotifyplaylistpull(link):
     for a in songdata:
         files.append(makedat(a))
     return [[readdat(a)['path'] for a in files],data['name']]
-    
+
 def makedat(info,overwrite=False):
-    if 'name' in info: name = info['name']
+    if 'name' in info: name = makefileable(info['name'])
     else: name = 'unknown'
-    if 'artist' in info: artist = info['artist']
+    if 'artist' in info: artist = makefileable(info['artist'])
     else: artist = 'unknown'
-    if 'album' in info: album = info['album']
+    if 'album' in info: album = makefileable(info['album'])
     else: album = 'unknown'
     if 'length' in info: length = info['length']
     else: length = 0
@@ -147,6 +157,7 @@ class MUSIC:
         self.playing = False
         self.storevolume = 1
         self.songlength = 1
+        self.awaitinginput = False
         
         self.initfiles()
         self.loadmusic()
@@ -230,6 +241,9 @@ class MUSIC:
         self.queue.insert(0,0)
              
     def update(self):
+        if self.awaitinginput:
+            if self.input != []:
+                self.importplaylist2()
         if self.activesong!=-1:
             self.realtime = round(pygame.mixer.music.get_pos()/1000)+self.missedtime
             if sectostr(self.realtime)!=ui.IDs['songtime'].text:
@@ -285,7 +299,7 @@ class MUSIC:
                   ui.maketext(0,0,'Album',30,textcenter=True,col=(62,63,75)),
                   ui.maketext(0,0,'Length',30,textcenter=True,col=(62,63,75)),'']
         wid = int((screenw-315-12)/3)
-        ui.maketable(160,100,[],titles,ID='playlist',boxwidth=[70,wid,wid,wid,70],boxheight=[40],backingdraw=True,textsize=20,verticalspacing=4,textcenter=False,col=(62,63,75),scalesize=False,scalex=False,scaley=False,roundedcorners=4)
+        ui.maketable(160,100,[],titles,ID='playlist',boxwidth=[70,wid,wid,wid,70],boxheight=[40],backingdraw=True,textsize=20,verticalspacing=4,textcenter=False,col=(62,63,75),scalesize=False,scalex=False,scaley=False,roundedcorners=4,clickablerect=pygame.Rect(160,100,2000,screenh-193))
         self.refreshsongtable()
         ui.makerect(156,0,2000,100,col=(62,63,75),scalesize=False,scalex=False,scaley=False,layer=2)
         ui.maketext(0,5,self.playlists[self.activeplaylist][1],80,anchor=('(w-175)/2+160',0),center=True,centery=False,scalesize=False,scalex=False,scaley=False,ID='playlist name',layer=3)
@@ -295,9 +309,9 @@ class MUSIC:
         ## side bar
         ui.makerect(150,0,4,1000,layer=2,scalesize=False,scalex=False,scaley=False)
         ui.maketext(75,30,'Playlists',40,center=True,scalesize=False,scalex=False,scaley=False)
-        ui.makebutton(12,50,'+',55,roundedcorners=30,width=35,height=35,textoffsety=-3,scalesize=False,scalex=False,scaley=False,command=self.makeplaylist)
-        ui.makebutton(50,50,'Import',32,roundedcorners=30,height=35,scalesize=False,scalex=False,scaley=False,command=self.importplaylist)
-        ui.maketable(10,95,[['']],roundedcorners=4,textsize=20,boxwidth=130,scalesize=False,scalex=False,scaley=False,verticalspacing=3,ID='playlist table')
+        ui.makebutton(12,50,'+',55,roundedcorners=30,width=35,height=35,textoffsety=-3,scalesize=False,scalex=False,scaley=False,command=self.makeplaylist,clickdownsize=2)
+        ui.makebutton(50,50,'Import',32,roundedcorners=30,height=35,scalesize=False,scalex=False,scaley=False,command=self.importplaylist,clickdownsize=2)
+        ui.maketable(5,95,[['']],roundedcorners=4,textsize=20,boxwidth=140,scalesize=False,scalex=False,scaley=False,verticalspacing=3,ID='playlist table')
         self.refreshplaylisttable()
         
         ## control menu
@@ -320,6 +334,13 @@ class MUSIC:
                           ['Image',ui.maketextbox(0,0,'',400,10,height=50,roundedcorners=2,textsize=30,col=(62,63,75),ID='inputinfo image',linelimit=10)]],boxwidth=[-1,500],boxheight=50,menu='song info',roundedcorners=4,textsize=30,scalesize=False,scalex=False,scaley=False,verticalspacing=3,col=(62,63,75))
         ui.makebutton(300,220,'Save',30,self.saveinfo,'song info',roundedcorners=8,spacing=2,horizontalspacing=14,center=True,centery=False,clickdownsize=2,scalesize=False,scalex=False,scaley=False)
         self.refreshsongdisplays()
+
+        ## playlist editor
+        ui.makebutton(0,0,'{pencil}',25,self.plsteditmenu,anchor=('w-5',5),objanchor=('w',0),roundedcorners=10,width=40,height=40,textoffsety=-1,scalesize=False,scalex=False,scaley=False,layer=3,clickdownsize=2)
+        ui.makewindowedmenu(160,20,600,99,'plstedit menu','main',col=(52,53,65),scalesize=False,scalex=False,scaley=False,roundedcorners=10,colorkey=(2,2,2),ID='plstedit menu')
+        ui.maketable(5,5,[['Name',ui.maketextbox(0,0,'',400,10,height=50,roundedcorners=2,textsize=30,col=(62,63,75),ID='inputinfo plstname',linelimit=10)]],menu='plstedit menu',roundedcorners=4,boxwidth=[-1,500],boxheight=50,textsize=30,scalesize=False,scalex=False,scaley=False,verticalspacing=3,col=(62,63,75),ID='plstedit table')
+        ui.makebutton(300,64,'Save',30,self.saveplstinfo,'plstedit menu',roundedcorners=8,spacing=2,horizontalspacing=14,center=True,centery=False,clickdownsize=2,scalesize=False,scalex=False,scaley=False)
+
     def setsongtime(self):
         if ui.IDs['song duration button'].clickedon == 2 and self.activesong!=-1:
             self.missedtime = ui.IDs['song duration'].slider-pygame.mixer.music.get_pos()/1000
@@ -365,19 +386,27 @@ class MUSIC:
         data = []
         for a in self.playlists:
             func = funcerpl(self.playlists.index(a),self)
-            data.append([ui.makebutton(0,0,a[1],25,clickdownsize=1,roundedcorners=4,verticalspacing=4,command=func.func)])
+            data.append([ui.makebutton(0,0,a[1],25,clickdownsize=1,roundedcorners=4,verticalspacing=4,command=func.func,maxwidth=130)])
         ui.IDs['playlist table'].data = data
         ui.IDs['playlist table'].refresh(ui)
         ui.IDs['playlist table'].refreshcords(ui)
     def importplaylist(self):
-        link = 'https://open.spotify.com/playlist/5B75Nl5U8eEpp7MUGzeOHt?si=197f49230b604cef'
+        self.thread = threading.Thread(target=self.getinput)
+        self.input = []
+        self.awaitinginput = True
+        self.thread.start()
+    def importplaylist2(self):
+        self.awaitinginput = False
+        link = self.input
         pl = spotifyplaylistpull(link)
-        self.loadmusic()
-        self.playlists.append(pl)
-        makeplst(pl)
-        self.moveplaylist(len(self.playlists)-1)
-        self.refreshplaylisttable()
-        
+        if pl != 0:
+            self.loadmusic()
+            self.playlists.append(pl)
+            makeplst(pl)
+            self.moveplaylist(len(self.playlists)-1)
+            self.refreshplaylisttable()
+    def getinput(self):
+        self.input = input('Enter your spotify link: ')
     def makeplaylist(self):
         self.playlists.append([[],'New Playlist '+str(len(self.playlists)+1)])
         makeplst([[],'New Playlist '+str(len(self.playlists))])
@@ -388,15 +417,17 @@ class MUSIC:
         self.shiftsongtable()
         self.activeplaylist = playlist
         self.refreshsongtable()
+        self.refreshplaylistdisplay()
+        ui.IDs['scroller'].scroller = 0
+        ui.IDs['scroller'].maxp = ui.IDs['playlist'].height
+        ui.IDs['scroller'].refresh(ui)
+    def refreshplaylistdisplay(self):
         ui.IDs['playlist name'].text = self.playlists[self.activeplaylist][1]
         ui.IDs['playlist name'].refresh(ui)
         ui.IDs['playlist name'].resetcords(ui)
         ui.IDs['playlist info'].text = str(len(self.playlists[self.activeplaylist][0]))+' songs'
         ui.IDs['playlist info'].refresh(ui)
         ui.IDs['playlist info'].resetcords(ui)
-        ui.IDs['scroller'].scroller = 0
-        ui.IDs['scroller'].maxp = ui.IDs['playlist'].height
-        ui.IDs['scroller'].refresh(ui)
     def addtoplaylist(self,playlist):
         self.playlists[[a[1] for a in self.playlists].index(playlist)][0].append(self.selected)
         makeplst(self.playlists[[a[1] for a in self.playlists].index(playlist)])
@@ -439,6 +470,19 @@ class MUSIC:
         ui.IDs['playlist add'].refreshcords(ui)
         ui.IDs['add menu'].height = ui.IDs['playlist add'].height+10
         ui.movemenu('add menu','down')
+    def plsteditmenu(self):
+        if self.activeplaylist!=0:
+            ui.IDs['inputinfo plstname'].text = self.playlists[self.activeplaylist][1]
+            ui.IDs['inputinfo plstname'].refresh(ui)
+            ui.movemenu('plstedit menu','down')
+    def saveplstinfo(self):
+        name = ui.IDs['inputinfo plstname'].text
+        old = self.playlists[self.activeplaylist][1]
+        self.playlists[self.activeplaylist][1] = name
+        os.rename(pyui.resourcepath(f'data\\playlists\\{old}.plst'),pyui.resourcepath(f'data\\playlists\\{name}.plst'))
+        self.refreshplaylisttable()
+        self.refreshplaylistdisplay()
+        ui.menuback()
     def saveinfo(self):
         name = ui.IDs['inputinfo name'].text
         artist = ui.IDs['inputinfo artist'].text
@@ -490,6 +534,7 @@ while not done:
             ui.IDs['scroller'].refresh(ui)
             wid = int((screenw-315-12)/3)
             ui.IDs['playlist'].boxwidth = [70,wid,wid,wid,70]
+            ui.IDs['playlist'].clickablerect = pygame.Rect(160,100,2000,screenh-193)
             ui.IDs['playlist'].refresh(ui)
             ui.IDs['playlist'].refreshcords(ui)
         if event.type == pygame.mixer.music.get_endevent():
@@ -506,4 +551,4 @@ while not done:
     pygame.display.flip()
     clock.tick(60)
 pygame.mixer.music.stop()
-pygame.quit() 
+pygame.quit()
