@@ -301,13 +301,13 @@ class MUSIC:
         wid = int((screenw-315-12)/3)
         ui.maketable(160,100,[],titles,ID='playlist',boxwidth=[70,wid,wid,wid,70],boxheight=[40],backingdraw=True,textsize=20,verticalspacing=4,textcenter=False,col=(62,63,75),scalesize=False,scalex=False,scaley=False,roundedcorners=4,clickablerect=pygame.Rect(160,100,2000,screenh-193))
         self.refreshsongtable()
-        ui.makerect(156,0,2000,100,col=(62,63,75),scalesize=False,scalex=False,scaley=False,layer=2)
+        ui.makerect(156,0,2000,100,col=(62,63,75),scalesize=False,scalex=False,scaley=False,layer=2,ID='title backing')
         ui.maketext(0,5,self.playlists[self.activeplaylist][1],80,anchor=('(w-175)/2+160',0),center=True,centery=False,scalesize=False,scalex=False,scaley=False,ID='playlist name',layer=3)
         ui.maketext(0,65,str(len(self.playlists[self.activeplaylist][0]))+' songs',30,anchor=('(w-175)/2+160',0),center=True,centery=False,scalesize=False,scalex=False,scaley=False,ID='playlist info',layer=3)
         ui.makescroller(0,0,screenh-193,self.shiftsongtable,maxp=ui.IDs['playlist'].height,pageheight=screenh-200,anchor=('w',100),objanchor=('w',0),ID='scroller',scalesize=False,scalex=False,scaley=False,runcommandat=1)
             
         ## side bar
-        ui.makerect(150,0,4,1000,layer=2,scalesize=False,scalex=False,scaley=False)
+        ui.makerect(150,0,4,1000,layer=2,scalesize=False,scalex=False,scaley=False,ID='playlists spliter')
         ui.maketext(75,30,'Playlists',40,center=True,scalesize=False,scalex=False,scaley=False)
         ui.makebutton(12,50,'+',55,roundedcorners=30,width=35,height=35,textoffsety=-3,scalesize=False,scalex=False,scaley=False,command=self.makeplaylist,clickdownsize=2)
         ui.makebutton(50,50,'Import',32,roundedcorners=30,height=35,scalesize=False,scalex=False,scaley=False,command=self.importplaylist,clickdownsize=2)
@@ -338,9 +338,11 @@ class MUSIC:
         ## playlist editor
         ui.makebutton(0,0,'{pencil}',25,self.plsteditmenu,anchor=('w-5',5),objanchor=('w',0),roundedcorners=10,width=40,height=40,textoffsety=-1,scalesize=False,scalex=False,scaley=False,layer=3,clickdownsize=2)
         ui.makewindowedmenu(160,20,600,99,'plstedit menu','main',col=(52,53,65),scalesize=False,scalex=False,scaley=False,roundedcorners=10,colorkey=(2,2,2),ID='plstedit menu')
-        ui.maketable(5,5,[['Name',ui.maketextbox(0,0,'',400,10,height=50,roundedcorners=2,textsize=30,col=(62,63,75),ID='inputinfo plstname',linelimit=10)]],menu='plstedit menu',roundedcorners=4,boxwidth=[-1,500],boxheight=50,textsize=30,scalesize=False,scalex=False,scaley=False,verticalspacing=3,col=(62,63,75),ID='plstedit table')
+        ui.maketable(5,5,[['Name',ui.maketextbox(0,0,'',400,10,height=50,roundedcorners=2,textsize=30,col=(62,63,75),ID='inputinfo plstname',linelimit=10,verticalspacing=2)]],menu='plstedit menu',roundedcorners=4,boxwidth=[84,500],boxheight=50,textsize=30,scalesize=False,scalex=False,scaley=False,verticalspacing=3,col=(62,63,75),ID='plstedit table')
         ui.makebutton(300,64,'Save',30,self.saveplstinfo,'plstedit menu',roundedcorners=8,spacing=2,horizontalspacing=14,center=True,centery=False,clickdownsize=2,scalesize=False,scalex=False,scaley=False)
-
+        ui.makebutton(595,94,'Delete',30,self.deleteplst,'plstedit menu',roundedcorners=8,spacing=2,horizontalspacing=14,objanchor=('w','h'),clickdownsize=2,scalesize=False,scalex=False,scaley=False,col=(180,60,60))
+        
+        
     def setsongtime(self):
         if ui.IDs['song duration button'].clickedon == 2 and self.activesong!=-1:
             self.missedtime = ui.IDs['song duration'].slider-pygame.mixer.music.get_pos()/1000
@@ -385,8 +387,10 @@ class MUSIC:
         ui.IDs['playlist table'].wipe(ui)
         data = []
         for a in self.playlists:
-            func = funcerpl(self.playlists.index(a),self)
-            data.append([ui.makebutton(0,0,a[1],25,clickdownsize=1,roundedcorners=4,verticalspacing=4,command=func.func,maxwidth=130)])
+            name = a[1].removesuffix('.plst')
+            if name[len(name)-5:] != '%del%':
+                func = funcerpl(self.playlists.index(a),self)
+                data.append([ui.makebutton(0,0,a[1],25,clickdownsize=1,roundedcorners=4,verticalspacing=4,command=func.func,maxwidth=130)])
         ui.IDs['playlist table'].data = data
         ui.IDs['playlist table'].refresh(ui)
         ui.IDs['playlist table'].refreshcords(ui)
@@ -475,6 +479,10 @@ class MUSIC:
             ui.IDs['inputinfo plstname'].text = self.playlists[self.activeplaylist][1]
             ui.IDs['inputinfo plstname'].refresh(ui)
             ui.movemenu('plstedit menu','down')
+    def deleteplst(self):
+        ui.IDs['inputinfo plstname'].text = self.playlists[self.activeplaylist][1]+'%del%'
+        self.saveplstinfo()
+        self.moveplaylist(0)
     def saveplstinfo(self):
         name = ui.IDs['inputinfo plstname'].text
         old = self.playlists[self.activeplaylist][1]
@@ -527,6 +535,8 @@ while not done:
             screenw = event.w
             screenh = event.h
             ui.IDs['controlbar'].width = screenw
+            ui.IDs['playlists spliter'].height = screenh
+            ui.IDs['title backing'].width = screenw
             ui.IDs['song duration'].width = event.w*music.songbarwidth
             ui.IDs['song duration'].resetcords(ui)
             ui.IDs['scroller'].height = screenh-193
