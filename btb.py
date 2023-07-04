@@ -1,5 +1,6 @@
 import pygame,math,random,sys,os,copy,requests,threading
 import PyUI as pyui
+##pygame.mixer.pre_init(44100, 16, 2, 4096)
 pygame.init()
 screenw = 800
 screenh = 600
@@ -74,6 +75,14 @@ def spotifyplaylistpull(link):
     for a in songdata:
         files.append(makedat(a))
     return [[readdat(a)['path'] for a in files],data['name']]
+
+def downloadyoutube(url,name):
+    import pytube
+    yt = pytube.YouTube(url)
+    audio = yt.streams.filter(only_audio=True).first()
+    mp3 = audio.download(pyui.resourcepath(''),'temp.mp3')
+    os.system("cd "+pyui.resourcepath(''))
+    os.system(f'ffmpeg -i temp.mp3 -vn -ar 44100 -ac 1 -b:a 32k -f mp3 "data\\mp3s\\{name}.mp3"')
 
 def makedat(info,overwrite=False):
     if 'name' in info: name = makefileable(info['name'])
@@ -158,8 +167,9 @@ class MUSIC:
         self.storevolume = 1
         self.songlength = 1
         self.awaitinginput = False
-        
+
         self.initfiles()
+        self.downloadyt()
         self.loadmusic()
         self.loadplaylists()
         self.activeplaylist = 0
@@ -182,12 +192,16 @@ class MUSIC:
         if not os.path.isdir(pyui.resourcepath('data\\images')):
             os.mkdir(pyui.resourcepath('data\\images'))
     def scanmp3s(self):
-        files = [pyui.resourcepath('data\\mp3s\\'+f) for f in os.listdir(pyui.resourcepath('data\\mp3s')) if f[len(f)-4:]=='.mp3']
+        files = [pyui.resourcepath('data\\mp3s\\'+f) for f in os.listdir(pyui.resourcepath('data\\mp3s')) if f[len(f)-4:] in ['.mp3','.wav']]
         for a in files:
-            fl = a.split('\\')[-1].removesuffix('.mp3')
+            fl = a.split('\\')[-1]
+            fl = fl.rsplit('.')[0]
             name = fl
             fl = pyui.resourcepath(fl+'.dat')
             if not os.path.isfile(fl):
+                print(a)
+                pygame.mixer.music.load(a)
+                print('loaded')
                 songmp3 = pygame.mixer.Sound(a)
                 length = round(songmp3.get_length())
                 makedat({'name':name,'length':length,'path':a,'downloaded':True})
@@ -299,7 +313,7 @@ class MUSIC:
                   ui.maketext(0,0,'Album',30,textcenter=True,col=(62,63,75)),
                   ui.maketext(0,0,'Length',30,textcenter=True,col=(62,63,75)),'']
         wid = int((screenw-315-12)/3)
-        ui.maketable(160,100,[],titles,ID='playlist',boxwidth=[70,wid,wid,wid,70],boxheight=[40],backingdraw=True,textsize=20,verticalspacing=4,textcenter=False,col=(62,63,75),scalesize=False,scalex=False,scaley=False,roundedcorners=4,clickablerect=pygame.Rect(160,100,2000,screenh-193))
+        ui.maketable(160,100,[],titles,ID='playlist',boxwidth=[70,wid,wid,wid,70],boxheight=[40],backingdraw=True,textsize=20,verticalspacing=4,textcenter=False,col=(62,63,75),scalesize=False,scalex=False,scaley=False,roundedcorners=4,clickablerect=pygame.Rect(160,100,4000,screenh-193))
         self.refreshsongtable()
         ui.makerect(156,0,2000,100,col=(62,63,75),scalesize=False,scalex=False,scaley=False,layer=2,ID='title backing')
         ui.maketext(0,5,self.playlists[self.activeplaylist][1],80,anchor=('(w-175)/2+160',0),center=True,centery=False,scalesize=False,scalex=False,scaley=False,ID='playlist name',layer=3)
@@ -449,9 +463,7 @@ class MUSIC:
         else: wid = 0
         if screenh-mpos[1]-100<ui.IDs['controlmenu'].height: hei = ui.IDs['controlmenu'].height
         else: hei = 0
-        ui.IDs['controlmenu'].x = mpos[0]-wid
-        ui.IDs['controlmenu'].y = mpos[1]-hei
-        ui.IDs['controlmenu'].startanchor = mpos
+        ui.IDs['controlmenu'].smartcords(mpos[0]-wid,mpos[1]-hei)
         ui.movemenu('control','down')
     def infomenu(self):
         dat = self.songdata[self.allsongs.index(self.selected)]
@@ -509,6 +521,8 @@ class MUSIC:
         makedat(self.songdata[self.allsongs.index(self.selected)],True)
         self.refreshsongtable()
         ui.menuback()
+    def downloadyt(self):
+        downloadyoutube('https://www.youtube.com/watch?v=9MHmx9nvHqU','greek tragedy')
         
     def playselected(self):
         self.activesong = self.selected
@@ -544,7 +558,7 @@ while not done:
             ui.IDs['scroller'].refresh(ui)
             wid = int((screenw-315-12)/3)
             ui.IDs['playlist'].boxwidth = [70,wid,wid,wid,70]
-            ui.IDs['playlist'].clickablerect = pygame.Rect(160,100,2000,screenh-193)
+            ui.IDs['playlist'].clickablerect = pygame.Rect(160,100,4000,screenh-193)
             ui.IDs['playlist'].refresh(ui)
             ui.IDs['playlist'].refreshcords(ui)
         if event.type == pygame.mixer.music.get_endevent():
