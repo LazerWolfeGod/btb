@@ -1,11 +1,11 @@
-import pygame,math,random,sys,os,copy,requests,threading
+import pygame,math,random,sys,os,copy,requests,threading,urllib,re
 import PyUI as pyui
 ##pygame.mixer.pre_init(44100, 16, 2, 4096)
 pygame.init()
 screenw = 800
 screenh = 600
 screen = pygame.display.set_mode((screenw, screenh),pygame.RESIZABLE)
-pygame.display.set_caption('btb')
+pygame.display.set_caption('Soundium')
 pygame.scrap.init()
 ui = pyui.UI()
 done = False
@@ -169,7 +169,7 @@ class MUSIC:
         self.awaitinginput = False
 
         self.initfiles()
-        self.downloadyt()
+##        self.downloadyt()
         self.loadmusic()
         self.loadplaylists()
         self.activeplaylist = 0
@@ -197,11 +197,10 @@ class MUSIC:
             fl = a.split('\\')[-1]
             fl = fl.rsplit('.')[0]
             name = fl
-            fl = pyui.resourcepath(fl+'.dat')
+            fl = pyui.resourcepath('data\\songs\\'+fl+'.dat')
             if not os.path.isfile(fl):
-                print(a)
                 pygame.mixer.music.load(a)
-                print('loaded')
+                print('Processed:',a)
                 songmp3 = pygame.mixer.Sound(a)
                 length = round(songmp3.get_length())
                 makedat({'name':name,'length':length,'path':a,'downloaded':True})
@@ -315,7 +314,7 @@ class MUSIC:
         wid = int((screenw-315-12)/3)
         ui.maketable(160,100,[],titles,ID='playlist',boxwidth=[70,wid,wid,wid,70],boxheight=[40],backingdraw=True,textsize=20,verticalspacing=4,textcenter=False,col=(62,63,75),scalesize=False,scalex=False,scaley=False,roundedcorners=4,clickablerect=pygame.Rect(160,100,4000,screenh-193))
         self.refreshsongtable()
-        ui.makerect(156,0,2000,100,col=(62,63,75),scalesize=False,scalex=False,scaley=False,layer=2,ID='title backing')
+        ui.makerect(156,0,3000,100,col=(62,63,75),scalesize=False,scalex=False,scaley=False,layer=2,ID='title backing')
         ui.maketext(0,5,self.playlists[self.activeplaylist][1],80,anchor=('(w-175)/2+160',0),center=True,centery=False,scalesize=False,scalex=False,scaley=False,ID='playlist name',layer=3)
         ui.maketext(0,65,str(len(self.playlists[self.activeplaylist][0]))+' songs',30,anchor=('(w-175)/2+160',0),center=True,centery=False,scalesize=False,scalex=False,scaley=False,ID='playlist info',layer=3)
         ui.makescroller(0,0,screenh-193,self.shiftsongtable,maxp=ui.IDs['playlist'].height,pageheight=screenh-200,anchor=('w',100),objanchor=('w',0),ID='scroller',scalesize=False,scalex=False,scaley=False,runcommandat=1)
@@ -356,6 +355,23 @@ class MUSIC:
         ui.makebutton(300,64,'Save',30,self.saveplstinfo,'plstedit menu',roundedcorners=8,spacing=2,horizontalspacing=14,center=True,centery=False,clickdownsize=2,scalesize=False,scalex=False,scaley=False)
         ui.makebutton(595,94,'Delete',30,self.deleteplst,'plstedit menu',roundedcorners=8,spacing=2,horizontalspacing=14,objanchor=('w','h'),clickdownsize=2,scalesize=False,scalex=False,scaley=False,col=(180,60,60))
         
+        ## downloading playlist
+        ui.makebutton(159,5,'{arrow stick=0.4 point=0.2 down}',30,command=self.downloadplaylist,layer=3,roundedcorners=10,spacing=5,clickdownsize=2,width=40,height=40,textoffsetx=1,scalesize=False)
+        ui.makewindowedmenu(0,0,600,500,'download playlist','main',(63,64,75),anchor=('w/2','h/2'),objanchor=('w/2','h/2'),roundedcorners=10,colorkey=(0,0,0),scalesize=False)
+
+        ## download new
+        ui.makebutton(204,5,'{search}',24,command=self.downloadnew,layer=3,roundedcorners=10,spacing=5,clickdownsize=2,width=40,height=40,textoffsetx=1,scalesize=False)
+        ui.makewindowedmenu(0,0,600,500,'download new','main',(63,64,75),anchor=('w/2','h/2'),objanchor=('w/2','h/2'),roundedcorners=10,colorkey=(0,0,0),scalesize=False)
+        ui.maketext(13,26,'Search',30,'download new',scalesize=False,layer=4,objanchor=(0,'h/2'),backingcol=(43,44,55))
+        ui.makebutton(-46,25,'{search}',18,menu='download new',scalesize=False,objanchor=(0,'h/2'),anchor=('580',0),layer=4,spacing=2,clickdownsize=1,roundedcorners=9,col=(63,64,75),borderdraw=False,hovercol=(59,60,71),command=self.searchyoutube)
+        ui.makebutton(-20,25,'{cross}',16,menu='download new',scalesize=False,objanchor=(0,'h/2'),anchor=('580',0),layer=4,spacing=2,clickdownsize=1,roundedcorners=9,col=(63,64,75),borderdraw=False,hovercol=(59,60,71),width=30,height=30,textoffsetx=1,textoffsety=1)
+        ui.maketextbox(10,10,'',580,menu='download new',commandifenter=True,height=30,scalesize=False,textsize=28,verticalspacing=2,roundedcorners=5,col=(63,64,75),layer=3,borderdraw=True,leftborder=80,rightborder=56,command=self.searchyoutube,ID='search bar')
+        ui.maketable(10,50,[],['Image','Title','Length','Download'],'download new',roundedcorners=5,verticalspacing=3,col=(6,64,75),boxwidth=[110,280,80,100],textsize=25,scalesize=False)
+        
+##        ui.maketext(10,10,'Download',40,'download')
+##        ui.makebutton(10,60,'Playlist',35,self.addmenu,'download')
+##        ui.maketextbox(10,10,menu='download',scalesize=False,col=(83,84,95),roundedcorners=3)
+
         
     def setsongtime(self):
         if ui.IDs['song duration button'].clickedon == 2 and self.activesong!=-1:
@@ -476,7 +492,7 @@ class MUSIC:
         ui.IDs['inputinfo album'].refresh(ui)
         ui.IDs['inputinfo image'].refresh(ui)
         ui.movemenu('song info','down')
-    def addmenu(self):
+    def addmenu(self,download=False):
         data = []
         for a in range(1,len(self.playlists)):
             func = funceram(self.playlists[a][1],self)
@@ -522,7 +538,7 @@ class MUSIC:
         self.refreshsongtable()
         ui.menuback()
     def downloadyt(self):
-        downloadyoutube('https://www.youtube.com/watch?v=9MHmx9nvHqU','greek tragedy')
+        downloadyoutube('https://www.youtube.com/watch?v=6oGqIfnIAEA','hurt')
         
     def playselected(self):
         self.activesong = self.selected
@@ -536,6 +552,19 @@ class MUSIC:
         self.queue.insert(0,self.selected)
         ui.menuback()
 
+    def downloadplaylist(self):
+        ui.movemenu('download playlist','down')
+    def downloadnew(self):
+        ui.movemenu('download new','down')
+    def searchyoutube(self):
+        term = ui.IDs['search bar'].text
+        html = urllib.request.urlopen('https://www.youtube.com/results?search_query='+term)
+        links = re.findall(r'watch\?v=(\S{11})',html.read().decode())
+        start = 'https://www.youtube.com/watch?v='
+        thumnail_url = "http://img.youtube.com/vi/{url}/0.jpg"
+        
+        print('links',len(links))
+        
     
 
 music = MUSIC()
