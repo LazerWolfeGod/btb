@@ -109,15 +109,19 @@ def makedat(info,overwrite=False):
         n = path.split('\\')[-1].removesuffix('.mp3')
         file = pyui.resourcepath('data\\songs\\'+n+'.dat')
     if not(os.path.isfile(file)) or overwrite:
-        with open(file,'w') as f:
-            f.write(f'name:{name}\n')
-            f.write(f'artist:{artist}\n')
-            f.write(f'album:{album}\n')
-            f.write(f'length:{length}\n')
-            f.write(f'image_path:{image_path}\n')
-            f.write(f'image_url:{image_url}\n')
-            f.write(f'path:{path}\n')
-            f.write(f'downloaded:{downloaded}\n')
+        try:
+            with open(file,'w') as f:
+                f.write(f'name:{name}\n')
+                f.write(f'artist:{artist}\n')
+                f.write(f'album:{album}\n')
+                f.write(f'length:{length}\n')
+                f.write(f'image_path:{image_path}\n')
+                f.write(f'image_url:{image_url}\n')
+                f.write(f'path:{path}\n')
+                f.write(f'downloaded:{downloaded}\n')
+        except:
+            print('failed to save:',name)
+            
     return file
 
 def readdat(path):
@@ -166,7 +170,7 @@ class MUSIC:
         self.playing = False
         self.storevolume = 1
         self.songlength = 1
-        self.awaitinginput = False
+        self.awaitingthreads = {}
 
         self.initfiles()
 ##        self.downloadyt()
@@ -254,9 +258,13 @@ class MUSIC:
         self.queue.insert(0,0)
              
     def update(self):
-        if self.awaitinginput:
-            if self.input != []:
-                self.importplaylist2()
+        delitem = False
+        for a in self.awaitingthreads:
+            if self.awaitingthreads[a][0]:
+                self.awaitingthreads[a][1]()
+                delitem = a
+        if delitem!=False:
+            del awaitingthreads[delitem]
         if self.activesong!=-1:
             self.realtime = round(pygame.mixer.music.get_pos()/1000)+self.missedtime
             if sectostr(self.realtime)!=ui.IDs['songtime'].text:
@@ -313,7 +321,7 @@ class MUSIC:
                   ui.maketext(0,0,'Length',30,textcenter=True,col=(62,63,75)),'']
         wid = int((screenw-315-12)/3)
         ui.maketable(160,100,[],titles,ID='playlist',boxwidth=[70,wid,wid,wid,70],boxheight=[40],backingdraw=True,textsize=20,verticalspacing=4,textcenter=False,col=(62,63,75),scalesize=False,scalex=False,scaley=False,roundedcorners=4,clickablerect=pygame.Rect(160,100,4000,screenh-193))
-        self.refreshsongtable()
+        self.refreshsongtable(False)
         ui.makerect(156,0,3000,100,col=(62,63,75),scalesize=False,scalex=False,scaley=False,layer=2,ID='title backing')
         ui.maketext(0,5,self.playlists[self.activeplaylist][1],80,anchor=('(w-175)/2+160',0),center=True,centery=False,scalesize=False,scalex=False,scaley=False,ID='playlist name',layer=3)
         ui.maketext(0,65,str(len(self.playlists[self.activeplaylist][0]))+' songs',30,anchor=('(w-175)/2+160',0),center=True,centery=False,scalesize=False,scalex=False,scaley=False,ID='playlist info',layer=3)
@@ -400,7 +408,13 @@ class MUSIC:
     def shiftsongtable(self):
         ui.IDs['playlist'].y = 100-ui.IDs['scroller'].scroll
         ui.IDs['playlist'].refreshcords(ui)
-    def refreshsongtable(self):
+    def refreshsongtable(self,thread=True):
+        if thread:
+            thread = threading.Thread(target=self.refreshsongtable2)
+            thread.start()
+        else:
+            self.refreshsongtable2()
+    def refreshsongtable2(self):
         ui.IDs['playlist'].wipe(ui,False)
         data = []
         for a in self.playlists[self.activeplaylist][0]:
@@ -425,10 +439,12 @@ class MUSIC:
         ui.IDs['playlist table'].refresh(ui)
         ui.IDs['playlist table'].refreshcords(ui)
     def importplaylist(self):
-        self.thread = threading.Thread(target=self.getinput)
-        self.input = []
-        self.awaitinginput = True
-        self.thread.start()
+        ID = 'import playlist'
+        if not (ID in self.awaitingthreads):
+            self.thread = threading.Thread(target=lambda: self.getinput(ID))
+            self.input = []
+            self.awaitingthreads[ID] = [False,self.importplaylist2]
+            self.thread.start()
     def importplaylist2(self):
         self.awaitinginput = False
         link = self.input
@@ -439,8 +455,9 @@ class MUSIC:
             makeplst(pl)
             self.moveplaylist(len(self.playlists)-1)
             self.refreshplaylisttable()
-    def getinput(self):
+    def getinput(self,ID):
         self.input = input('Enter your spotify link: ')
+        self.awaitingthreads[ID][0] = True
     def makeplaylist(self):
         self.playlists.append([[],'New Playlist '+str(len(self.playlists)+1)])
         makeplst([[],'New Playlist '+str(len(self.playlists))])
@@ -558,6 +575,7 @@ class MUSIC:
         ui.movemenu('download new','down')
     def searchyoutube(self):
         term = ui.IDs['search bar'].text
+    def searchyoutube2(self):
         html = urllib.request.urlopen('https://www.youtube.com/results?search_query='+term)
         links = re.findall(r'watch\?v=(\S{11})',html.read().decode())
         start = 'https://www.youtube.com/watch?v='
