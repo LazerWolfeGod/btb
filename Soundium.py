@@ -305,7 +305,9 @@ class MUSIC:
             ui.IDs['artist name'].refresh(ui)
             ui.IDs['artist name'].resetcords(ui)
             if self.songdata[self.allsongs.index(self.activesong)]['image_path'] != 'none':
+                ui.IDs['song img'].textsize = 70
                 ui.IDs['song img'].img = pygame.image.load(self.songdata[self.allsongs.index(self.activesong)]['image_path'])
+                if ui.IDs['song img'].img.get_width()/ui.IDs['song img'].img.get_height()>1.1: ui.IDs['song img'].textsize*=0.75
             else:
                 ui.IDs['song img'].img = pyui.loadinganimation(12)
             ui.IDs['song img'].refresh(ui)
@@ -445,7 +447,7 @@ class MUSIC:
             if dat['image_path'] == 'none': img = '-'
             else:
                 image = pygame.image.load(dat['image_path'])
-                if image.get_width()/image.get_height()>1.1: txtsize = 40
+                if image.get_width()/image.get_height()>1.1: txtsize = 48
                 else: txtsize = 64
                 img = ui.maketext(-100,-100,'',txtsize,img=image,col=(62,63,75),roundedcorners=4,textcenter=True,scalesize=False,enabled=False)
             data.append([img,dat['name']+'\n- '+dat['artist'],dat['album'],sectostr(float(dat['length'])),obj])
