@@ -1,5 +1,6 @@
-import pygame,math,random,sys,os,copy,requests,threading,urllib,re
+import pygame,time,math,random,sys,os,copy,requests,threading,urllib,re,pytube
 import PyUI as pyui
+from bs4 import BeautifulSoup
 ##pygame.mixer.pre_init(44100, 16, 2, 4096)
 pygame.init()
 screenw = 800
@@ -31,8 +32,11 @@ def makefileable(name):
         name = name.replace(a,'')
     return name
 
-def loadimage(url,name):
-    path = pyui.resourcepath(f'data\\images\\{name}.png')
+def loadimage(url,name,thumbnail=False):
+    if thumbnail:
+        path = pyui.resourcepath(f'data\\thumbnails\\{name}.png')
+    else:
+        path = pyui.resourcepath(f'data\\images\\{name}.png')
     if not os.path.isfile(path):
         img_data = requests.get(url).content
         with open(path, 'wb') as handler:
@@ -76,13 +80,18 @@ def spotifyplaylistpull(link):
         files.append(makedat(a))
     return [[readdat(a)['path'] for a in files],data['name']]
 
-def downloadyoutube(url,name):
-    import pytube
+def downloadyoutube(url,name,music):
     yt = pytube.YouTube(url)
     audio = yt.streams.filter(only_audio=True).first()
     mp3 = audio.download(pyui.resourcepath(''),'temp.mp3')
     os.system("cd "+pyui.resourcepath(''))
     os.system(f'ffmpeg -i temp.mp3 -vn -ar 44100 -ac 1 -b:a 32k -f mp3 "data\\mp3s\\{name}.mp3"')
+##    loadimage(f'http://img.youtube.com/vi/{url.split("=")[-1]}/0.jpg',name)
+    music.scanmp3s(f'http://img.youtube.com/vi/{url.split("=")[-1]}/0.jpg')
+    music.loadmusic()
+    music.loadplaylists()
+    music.refreshsongtable(True,True)
+    music.awaitingthreads['download youtube'][0] = True
 
 def makedat(info,overwrite=False):
     if 'name' in info: name = makefileable(info['name'])
@@ -109,15 +118,20 @@ def makedat(info,overwrite=False):
         n = path.split('\\')[-1].removesuffix('.mp3')
         file = pyui.resourcepath('data\\songs\\'+n+'.dat')
     if not(os.path.isfile(file)) or overwrite:
-        with open(file,'w') as f:
-            f.write(f'name:{name}\n')
-            f.write(f'artist:{artist}\n')
-            f.write(f'album:{album}\n')
-            f.write(f'length:{length}\n')
-            f.write(f'image_path:{image_path}\n')
-            f.write(f'image_url:{image_url}\n')
-            f.write(f'path:{path}\n')
-            f.write(f'downloaded:{downloaded}\n')
+        try:
+            with open(file,'w') as f:
+                f.write(f'name:{name}\n')
+                f.write(f'artist:{artist}\n')
+                f.write(f'album:{album}\n')
+                f.write(f'length:{length}\n')
+                f.write(f'image_path:{image_path}\n')
+                f.write(f'image_url:{image_url}\n')
+                f.write(f'path:{path}\n')
+                f.write(f'downloaded:{downloaded}\n')
+                f.write(f'time:{time.time()}\n')
+        except:
+            print('failed to save:',name)
+            
     return file
 
 def readdat(path):
@@ -129,6 +143,7 @@ def readdat(path):
         split = b.split(':',1)
         if split[1] == 'False': split[1] = False
         elif split[1] == 'True': split[1] = True
+        elif split[0] == 'time': split[1] = float(split[1])
         info[split[0]] = split[1]
     return info
 
@@ -159,6 +174,9 @@ class funcerpl:
 class funceram:
     def __init__(self,param,music):
         self.func = lambda: music.addtoplaylist(param)
+class funceryt:
+    def __init__(self,url,name,music):
+        self.func = lambda: music.downloadyoutube(url,name)
         
 class MUSIC:
     def __init__(self):
@@ -166,10 +184,10 @@ class MUSIC:
         self.playing = False
         self.storevolume = 1
         self.songlength = 1
-        self.awaitinginput = False
+        self.awaitingthreads = {}
 
         self.initfiles()
-##        self.downloadyt()
+        self.scanmp3s()
         self.loadmusic()
         self.loadplaylists()
         self.activeplaylist = 0
@@ -191,7 +209,9 @@ class MUSIC:
             os.mkdir(pyui.resourcepath('data\\playlists'))
         if not os.path.isdir(pyui.resourcepath('data\\images')):
             os.mkdir(pyui.resourcepath('data\\images'))
-    def scanmp3s(self):
+        if not os.path.isdir(pyui.resourcepath('data\\thumbnails')):
+            os.mkdir(pyui.resourcepath('data\\thumbnails'))
+    def scanmp3s(self,image='none'):
         files = [pyui.resourcepath('data\\mp3s\\'+f) for f in os.listdir(pyui.resourcepath('data\\mp3s')) if f[len(f)-4:] in ['.mp3','.wav']]
         for a in files:
             fl = a.split('\\')[-1]
@@ -199,20 +219,21 @@ class MUSIC:
             name = fl
             fl = pyui.resourcepath('data\\songs\\'+fl+'.dat')
             if not os.path.isfile(fl):
-                pygame.mixer.music.load(a)
                 print('Processed:',a)
                 songmp3 = pygame.mixer.Sound(a)
                 length = round(songmp3.get_length())
-                makedat({'name':name,'length':length,'path':a,'downloaded':True})
+                print(image)
+                makedat({'name':name,'length':length,'path':a,'downloaded':True,'image_url':image})
     def loadmusic(self):
-        self.scanmp3s()
         files = [pyui.resourcepath('data\\songs\\'+f) for f in os.listdir(pyui.resourcepath('data\\songs')) if f[len(f)-4:]=='.dat']
         self.songdata = []
-        self.allsongs = []
         for file in files:
             self.songdata.append(readdat(file))
+        alldat = []
         for a in self.songdata:
-            self.allsongs.append(a['path'])
+            alldat.append([a['path'],a['time']])
+        alldat.sort(key=lambda x:x[1])
+        self.allsongs = [a[0] for a in alldat]
     def loadplaylists(self):
         self.playlists = []
         self.playlists.append([[self.allsongs[a] for a in range(len(self.allsongs))],'All Music'])
@@ -254,9 +275,15 @@ class MUSIC:
         self.queue.insert(0,0)
              
     def update(self):
-        if self.awaitinginput:
-            if self.input != []:
-                self.importplaylist2()
+        delitem = False
+##        print(self.awaitingthreads)
+        for a in self.awaitingthreads:
+##            print(a)
+            if self.awaitingthreads[a][0]:
+                self.awaitingthreads[a][1]()
+                delitem = a
+        if delitem!=False:
+            del self.awaitingthreads[delitem]
         if self.activesong!=-1:
             self.realtime = round(pygame.mixer.music.get_pos()/1000)+self.missedtime
             if sectostr(self.realtime)!=ui.IDs['songtime'].text:
@@ -312,8 +339,8 @@ class MUSIC:
                   ui.maketext(0,0,'Album',30,textcenter=True,col=(62,63,75)),
                   ui.maketext(0,0,'Length',30,textcenter=True,col=(62,63,75)),'']
         wid = int((screenw-315-12)/3)
-        ui.maketable(160,100,[],titles,ID='playlist',boxwidth=[70,wid,wid,wid,70],boxheight=[40],backingdraw=True,textsize=20,verticalspacing=4,textcenter=False,col=(62,63,75),scalesize=False,scalex=False,scaley=False,roundedcorners=4,clickablerect=pygame.Rect(160,100,4000,screenh-193))
-        self.refreshsongtable()
+        ui.maketable(160,100,[],titles,ID='playlist',boxwidth=[70,wid,wid,wid,70],boxheight=[40],backingdraw=True,textsize=20,verticalspacing=4,textcenter=False,col=(62,63,75),scalesize=False,scalex=False,scaley=False,roundedcorners=4,clickablerect=pygame.Rect(160,100,4000,screenh-193),guessheight=70)
+        self.refreshsongtable(False)
         ui.makerect(156,0,3000,100,col=(62,63,75),scalesize=False,scalex=False,scaley=False,layer=2,ID='title backing')
         ui.maketext(0,5,self.playlists[self.activeplaylist][1],80,anchor=('(w-175)/2+160',0),center=True,centery=False,scalesize=False,scalex=False,scaley=False,ID='playlist name',layer=3)
         ui.maketext(0,65,str(len(self.playlists[self.activeplaylist][0]))+' songs',30,anchor=('(w-175)/2+160',0),center=True,centery=False,scalesize=False,scalex=False,scaley=False,ID='playlist info',layer=3)
@@ -361,12 +388,12 @@ class MUSIC:
 
         ## download new
         ui.makebutton(204,5,'{search}',24,command=self.downloadnew,layer=3,roundedcorners=10,spacing=5,clickdownsize=2,width=40,height=40,textoffsetx=1,scalesize=False)
-        ui.makewindowedmenu(0,0,600,500,'download new','main',(63,64,75),anchor=('w/2','h/2'),objanchor=('w/2','h/2'),roundedcorners=10,colorkey=(0,0,0),scalesize=False)
+        ui.makewindowedmenu(0,0,600,519,'download new','main',(63,64,75),anchor=('w/2','h/2'),objanchor=('w/2','h/2'),roundedcorners=10,colorkey=(11,183,2),scalesize=False)
         ui.maketext(13,26,'Search',30,'download new',scalesize=False,layer=4,objanchor=(0,'h/2'),backingcol=(43,44,55))
         ui.makebutton(-46,25,'{search}',18,menu='download new',scalesize=False,objanchor=(0,'h/2'),anchor=('580',0),layer=4,spacing=2,clickdownsize=1,roundedcorners=9,col=(63,64,75),borderdraw=False,hovercol=(59,60,71),command=self.searchyoutube)
         ui.makebutton(-20,25,'{cross}',16,menu='download new',scalesize=False,objanchor=(0,'h/2'),anchor=('580',0),layer=4,spacing=2,clickdownsize=1,roundedcorners=9,col=(63,64,75),borderdraw=False,hovercol=(59,60,71),width=30,height=30,textoffsetx=1,textoffsety=1)
         ui.maketextbox(10,10,'',580,menu='download new',commandifenter=True,height=30,scalesize=False,textsize=28,verticalspacing=2,roundedcorners=5,col=(63,64,75),layer=3,borderdraw=True,leftborder=80,rightborder=56,command=self.searchyoutube,ID='search bar')
-        ui.maketable(10,50,[],['Image','Title','Length','Download'],'download new',roundedcorners=5,verticalspacing=3,col=(6,64,75),boxwidth=[110,280,80,100],textsize=25,scalesize=False)
+        ui.maketable(10,50,[],['Image','Title',''],'download new',roundedcorners=5,verticalspacing=3,col=(6,64,75),boxwidth=[110,362,100],boxheight=[25],textsize=25,scalesize=False,ID='search table',guessheight=84)
         
 ##        ui.maketext(10,10,'Download',40,'download')
 ##        ui.makebutton(10,60,'Playlist',35,self.addmenu,'download')
@@ -400,19 +427,35 @@ class MUSIC:
     def shiftsongtable(self):
         ui.IDs['playlist'].y = 100-ui.IDs['scroller'].scroll
         ui.IDs['playlist'].refreshcords(ui)
-    def refreshsongtable(self):
+    def refreshsongtable(self,thread=True,scroller=False):
+        self.awaitingthreads['songs refresh'] = [False,pyui.emptyfunction]
+        if thread:
+            thread = threading.Thread(target=lambda: self.refreshsongtable2(scroller))
+            thread.start()
+        else:
+            self.refreshsongtable2(scroller)
+    def refreshsongtable2(self,scroller):
+        ui.IDs['playlist'].disable()
         ui.IDs['playlist'].wipe(ui,False)
         data = []
         for a in self.playlists[self.activeplaylist][0]:
             func = funcercm(a,self)
-            obj = ui.makebutton(0,0,'{dots}',20,command=func.func,col=(62,63,75),clickdownsize=1,roundedcorners=4)
+            obj = ui.makebutton(-100,-100,'{dots}',20,command=func.func,col=(62,63,75),clickdownsize=1,roundedcorners=4,enabled=False)
             dat = self.songdata[self.allsongs.index(a)]
             if dat['image_path'] == 'none': img = '-'
-            else: img = ui.maketext(0,0,'',64,img=pygame.image.load(dat['image_path']),col=(62,63,75),roundedcorners=4,textcenter=True,scalesize=False)
+            else:
+                image = pygame.image.load(dat['image_path'])
+                if image.get_width()/image.get_height()>1.1: txtsize = 40
+                else: txtsize = 64
+                img = ui.maketext(-100,-100,'',txtsize,img=image,col=(62,63,75),roundedcorners=4,textcenter=True,scalesize=False,enabled=False)
             data.append([img,dat['name']+'\n- '+dat['artist'],dat['album'],sectostr(float(dat['length'])),obj])
         ui.IDs['playlist'].data = data
         ui.IDs['playlist'].refresh(ui)
-        ui.IDs['playlist'].refreshcords(ui)
+        if scroller:
+            ui.IDs['scroller'].scroller = 0
+            ui.IDs['scroller'].maxp = ui.IDs['playlist'].height
+            ui.IDs['scroller'].refresh(ui)
+        self.awaitingthreads['songs refresh'][0] = True
     def refreshplaylisttable(self):
         ui.IDs['playlist table'].wipe(ui)
         data = []
@@ -425,10 +468,12 @@ class MUSIC:
         ui.IDs['playlist table'].refresh(ui)
         ui.IDs['playlist table'].refreshcords(ui)
     def importplaylist(self):
-        self.thread = threading.Thread(target=self.getinput)
-        self.input = []
-        self.awaitinginput = True
-        self.thread.start()
+        ID = 'import playlist'
+        if not (ID in self.awaitingthreads):
+            self.thread = threading.Thread(target=lambda: self.getinput(ID))
+            self.input = []
+            self.awaitingthreads[ID] = [False,self.importplaylist2]
+            self.thread.start()
     def importplaylist2(self):
         self.awaitinginput = False
         link = self.input
@@ -439,22 +484,21 @@ class MUSIC:
             makeplst(pl)
             self.moveplaylist(len(self.playlists)-1)
             self.refreshplaylisttable()
-    def getinput(self):
+    def getinput(self,ID):
         self.input = input('Enter your spotify link: ')
+        self.awaitingthreads[ID][0] = True
     def makeplaylist(self):
         self.playlists.append([[],'New Playlist '+str(len(self.playlists)+1)])
         makeplst([[],'New Playlist '+str(len(self.playlists))])
         self.moveplaylist(len(self.playlists)-1)
         self.refreshplaylisttable()
     def moveplaylist(self,playlist):
-        ui.IDs['scroller'].scroll = 0
-        self.shiftsongtable()
-        self.activeplaylist = playlist
-        self.refreshsongtable()
-        self.refreshplaylistdisplay()
-        ui.IDs['scroller'].scroller = 0
-        ui.IDs['scroller'].maxp = ui.IDs['playlist'].height
-        ui.IDs['scroller'].refresh(ui)
+        if not ('songs refresh' in self.awaitingthreads):
+            ui.IDs['scroller'].scroll = 0
+            self.shiftsongtable()
+            self.activeplaylist = playlist
+            self.refreshsongtable(scroller=True)
+            self.refreshplaylistdisplay()
     def refreshplaylistdisplay(self):
         ui.IDs['playlist name'].text = self.playlists[self.activeplaylist][1]
         ui.IDs['playlist name'].refresh(ui)
@@ -557,16 +601,44 @@ class MUSIC:
     def downloadnew(self):
         ui.movemenu('download new','down')
     def searchyoutube(self):
-        term = ui.IDs['search bar'].text
-        html = urllib.request.urlopen('https://www.youtube.com/results?search_query='+term)
+        if not('youtube search' in self.awaitingthreads):
+            self.awaitingthreads['youtube search'] = [False,pyui.emptyfunction]
+            thread = threading.Thread(target=self.searchyoutube2)
+            thread.start()
+    def searchyoutube2(self):
+        term = ui.IDs['search bar'].text.replace(' ','+')
+        html = urllib.request.urlopen(f'https://www.youtube.com/results?search_query="{term}"')
         links = re.findall(r'watch\?v=(\S{11})',html.read().decode())
-        start = 'https://www.youtube.com/watch?v='
-        thumnail_url = "http://img.youtube.com/vi/{url}/0.jpg"
-        
-        print('links',len(links))
-        
+        rem = []
+        for a in range(len(links)):
+            if links[a] in links[:max(a,0)]:
+                rem.append(links[a])
+        for b in rem:
+            links.remove(b)
+        ui.IDs['search table'].wipe(ui)
+        data = []
+        a = 0
+        while len(data)<min(5,len(links)):
+            dat = BeautifulSoup(requests.get(f'https://www.youtube.com/watch?v={links[a]}').text,'html.parser')
+            title = str(dat.find_all(name='title')[0]).replace('<title>','').replace('</title>','')
+            if not('#' in title):
+                func = funceryt(f'https://www.youtube.com/watch?v={links[a]}',title,music)
+                obj = ui.makebutton(-100,-100,'Download',25,func.func,roundedcorners=5,col=(6,64,75),enabled=False,clickdownsize=2)
+                thumbnail = 'thumbnail'+str(random.randint(0,100000000))
+                loadimage(f'http://img.youtube.com/vi/{links[a]}/0.jpg',thumbnail,True)
+                textobj = ui.maketext(-100,-100,'',78,img=pygame.image.load(pyui.resourcepath(f'data\\thumbnails\\{thumbnail}.png')),backingcol=(6,64,75))
+                data.append([textobj,title,obj])
+                ui.IDs['search table'].data = data
+                ui.IDs['search table'].threadrefresh(ui)
+            a+=1        
+        self.awaitingthreads['youtube search'][0] = True
+    def downloadyoutube(self,url,name):
+        if not('download youtube' in self.awaitingthreads):
+            self.awaitingthreads['download youtube'] = [False,pyui.emptyfunction]
+            thread = threading.Thread(target=downloadyoutube(url,name,self))
+            thread.start()
     
-
+     
 music = MUSIC()
 
 while not done:
