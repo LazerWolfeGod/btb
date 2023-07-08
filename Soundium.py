@@ -108,7 +108,8 @@ def makedat(info,overwrite=False):
     else:
         if image_url == 'none':image_path = 'none'
         else:
-            image_path = loadimage(image_url,album)
+            if album == 'unknown': image_path = loadimage(image_url,name)
+            else: image_path = loadimage(image_url,album)
     if 'path' in info: path = info['path']
     else: path = pyui.resourcepath('data\\mp3\\'+name+'-'+artist+'.mp3')
     if 'downloaded' in info: downloaded = info['downloaded']
@@ -227,13 +228,12 @@ class MUSIC:
     def loadmusic(self):
         files = [pyui.resourcepath('data\\songs\\'+f) for f in os.listdir(pyui.resourcepath('data\\songs')) if f[len(f)-4:]=='.dat']
         self.songdata = []
+        self.allsongs = []
         for file in files:
             self.songdata.append(readdat(file))
-        alldat = []
+        self.songdata.sort(key=lambda x: x['time'])
         for a in self.songdata:
-            alldat.append([a['path'],a['time']])
-        alldat.sort(key=lambda x:x[1])
-        self.allsongs = [a[0] for a in alldat]
+            self.allsongs.append(a['path'])
     def loadplaylists(self):
         self.playlists = []
         self.playlists.append([[self.allsongs[a] for a in range(len(self.allsongs))],'All Music'])
@@ -517,6 +517,7 @@ class MUSIC:
             makeplst(self.playlists[self.activeplaylist])
             self.refreshsongtable()
     def controlmenu(self,song):
+        print(song)
         self.selected = song
         mpos = pygame.mouse.get_pos()
         if screenw-mpos[0]<ui.IDs['controlmenu'].width: wid = ui.IDs['controlmenu'].width
