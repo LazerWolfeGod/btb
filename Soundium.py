@@ -253,6 +253,7 @@ class MUSIC:
 
         self.makegui()
 
+
     def initfiles(self):
         if not os.path.isdir(pyui.resourcepath('data')):
             os.mkdir(pyui.resourcepath('data'))
@@ -294,11 +295,20 @@ class MUSIC:
     def loadplaylists(self):
         self.playlists = []
         self.playlists.append([[self.allsongs[a] for a in range(len(self.allsongs))],'All Music'])
+        self.playlists.append([[self.allsongs[a] for a in range(len(self.allsongs))],'Queue'])
+        self.playlists.append([[self.allsongs[a] for a in range(len(self.allsongs))],'History'])
+        
         files = [pyui.resourcepath('data\\playlists\\'+f) for f in os.listdir(pyui.resourcepath('data\\playlists')) if f[len(f)-5:]=='.plst']
         for a in files:
             self.playlists.append(readplst(path=a))
     def generatequeue(self):
-        if not self.shuffle:
+        if 'shuffle button' in ui.IDs and ui.IDs['shuffle button'].toggle:
+            self.queue = [self.playlists[self.activeplaylist][0][a] for a in range(self.playlists[self.activeplaylist][0].index(self.activesong),len(self.playlists[self.activeplaylist][0]))]
+            random.shuffle(self.queue)
+            if self.activesong in self.queue:
+                self.queue.remove(self.activesong)
+                self.queue.insert(0,self.activesong)
+        else:
             if self.activesong == -1:
                 self.queue = copy.copy(self.playlists[self.activeplaylist][0])
             else:
@@ -308,7 +318,7 @@ class MUSIC:
         self.missedtime = 0
         self.realtime = 0
         if self.activesong != -1:
-            self.songhistory.append(self.songdata[self.allsongs.index(self.activesong)]['mp3_path'])
+            self.songhistory.append(self.songdata[self.allsongs.index(self.activesong)]['dat_path'])
         if len(self.queue)!=0:
             self.activesong = self.queue[0]
             del self.queue[0]
@@ -331,7 +341,13 @@ class MUSIC:
             ui.IDs['playpause button'].toggle = False
             self.activesong = -1
     def prevsong(self):
-        self.queue.insert(0,0)
+        if len(self.songhistory)>0:
+            current = self.activesong
+            self.queue.insert(0,self.songhistory[-1])
+            self.nextsong()
+            self.queue.insert(0,current)
+            del self.songhistory[-1]
+            del self.songhistory[-1]
              
     def update(self):
         if ui.activemenu == 'main':
@@ -380,7 +396,7 @@ class MUSIC:
         ## main 3 buttons
         ui.makerect(0,0,screenw,93,col=(32,33,35),anchor=(0,'h-93'),layer=4,scalesize=False,ID='controlbar')
         ui.makebutton(0,0,'{pause rounded=0.1}',30,anchor=('w/2','h-60'),toggletext='{play rounded=0.05}',toggleable=True,togglecol=(16,163,127),center=True,width=49,height=49,roundedcorners=100,scalesize=False,clickdownsize=2,command=self.playpause,toggle=self.playing,ID='playpause button',layer=5)
-        ui.makebutton(0,0,'{skip rounded=0.05 left}',22,anchor=('w/2-55','h-60'),center=True,width=45,height=45,roundedcorners=100,scalesize=False,clickdownsize=2,layer=5)
+        ui.makebutton(0,0,'{skip rounded=0.05 left}',22,anchor=('w/2-55','h-60'),center=True,width=45,height=45,roundedcorners=100,scalesize=False,clickdownsize=2,layer=5,command=self.prevsong)
         ui.makebutton(0,0,'{skip rounded=0.05}',22,anchor=('w/2+55','h-60'),center=True,width=45,height=45,roundedcorners=100,scalesize=False,clickdownsize=2,command=self.nextsong,layer=5)
 
         ## song progress slider
@@ -391,6 +407,8 @@ class MUSIC:
         ## volume control
         ui.makeslider(0,0,100,12,maxp=1,anchor=('w-10','h-46'),objanchor=('w','h/2'),border=1,roundedcorners=4,button=ui.makebutton(0,0,'',width=20,height=20,clickdownsize=0,borderdraw=False,backingdraw=False,runcommandat=1,command=self.setvolume,ID='volume button'),movetoclick=True,scalesize=False,col=(131,243,216),backingcol=(16,163,127),startp=self.storevolume,ID='volume',layer=5)
         ui.makebutton(0,0,'{speaker}',20,anchor=('w-120','h-46'),objanchor=('w','h/2'),roundedcorners=10,scalesize=False,clickdownsize=2,spacing=4,toggleable=True,togglecol=(16,163,127),toggletext='{mute}',command=self.mutetoggle,ID='mute button',layer=5)
+        ui.makebutton(0,0,'{shuffle}{tick}',20,anchor=('w-165','h-46'),objanchor=('w','h/2'),roundedcorners=10,scalesize=False,clickdownsize=2,spacing=4,toggleable=True,togglecol=(16,163,127),toggletext='{shuffle}{cross}',command=self.mutetoggle,ID='shuffle button',layer=5,width=60,height=35)
+
 
         ## song title/image
         ui.maketext(0,0,'',70,anchor=('50','h-46'),center=True,scalesize=False,img=pyui.loadinganimation(12),ID='song img',layer=5)
@@ -452,9 +470,9 @@ class MUSIC:
         ## downloading playlist
         ui.makebutton(159,5,'{arrow stick=0.4 point=0.2 down}',30,command=self.downloadplaylist,layer=3,roundedcorners=10,spacing=5,clickdownsize=2,width=40,height=40,textoffsetx=1,scalesize=False)
         ui.makewindowedmenu(160,10,300,140,'download playlist','main',(63,64,75),roundedcorners=10,colorkey=(0,0,0),scalesize=False)
-        ui.maketext(150,10,'Auto Download',35,'download playlist',objanchor=('w/2',0),backingcol=(63,64,75),textcenter=True)
-        ui.maketext(150,40,'x Songs from playlist?',35,'download playlist',ID='download playlist text',objanchor=('w/2',0),backingcol=(63,64,75),textcenter=True)
-        ui.makebutton(150,80,'Download',40,self.fullautodownload,'download playlist',ID='download playlist button',objanchor=('w/2',0),roundedcorners=5,verticalspacing=5)
+        ui.maketext(150,10,'Auto Download',35,'download playlist',objanchor=('w/2',0),backingcol=(63,64,75),textcenter=True,scalesize=False)
+        ui.maketext(150,40,'x Songs from playlist?',35,'download playlist',ID='download playlist text',objanchor=('w/2',0),backingcol=(63,64,75),textcenter=True,scalesize=False)
+        ui.makebutton(150,80,'Download',40,self.fullautodownload,'download playlist',ID='download playlist button',objanchor=('w/2',0),roundedcorners=5,verticalspacing=5,scalesize=False)
         
 
 
@@ -516,6 +534,9 @@ class MUSIC:
         else:
             self.refreshsongtable2(scroller)
     def refreshsongtable2(self,scroller):
+        self.playlists[1] = [self.queue[:30],self.playlists[1][1]]
+        self.playlists[2] = [self.songhistory[:30],self.playlists[2][1]]
+        
         ui.IDs['playlist'].disable()
         ui.IDs['playlist'].wipe(ui,False)
         data = []
