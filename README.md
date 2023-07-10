@@ -16,4 +16,4 @@ r'a\.[a-zA-Z]\s*&&\s*\([a-z]\s*=\s*a\.get\("n"\)\)\s*&&.*?\|\|\s*([a-z]+)',
         r'\([a-z]\s*=\s*([a-zA-Z0-9$]+)(\[\d+\])?\([a-z]\)', ]
 ```
 
-On my computer i have found ffmpeg to be unreliable with how it is used, my solution that fixes the problem is to take the ffmpeg.exe file in the bin folder when you install it, and place that in the same file as Soundium.
+On my computer i have found ffmpeg to be unreliable with how it is used, my solution that fixes the problem is to take the ffmpeg.exe file in the bin folder when you install it, and place that in the same file as Soundium. And the SOundium.exe file still needs ffmpeg.exe to be in the same folder for it to runj properly, otherwise it wont download songs properly and may crash.
