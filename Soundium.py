@@ -313,6 +313,7 @@ class MUSIC:
                 self.queue = copy.copy(self.playlists[self.activeplaylist][0])
             else:
                 self.queue = [self.playlists[self.activeplaylist][0][a] for a in range(self.playlists[self.activeplaylist][0].index(self.activesong),len(self.playlists[self.activeplaylist][0]))]
+        self.refreshqueue()
     def nextsong(self):
         pygame.mixer.music.unload()
         self.missedtime = 0
@@ -325,6 +326,7 @@ class MUSIC:
             while len(self.queue)>0 and not(self.songdata[self.allsongs.index(self.activesong)]['downloaded']):
                 self.activesong = self.queue[0]
                 del self.queue[0]
+                self.refreshqueue()
             if self.songdata[self.allsongs.index(self.activesong)]['downloaded']:
                 pygame.mixer.music.load(self.songdata[self.allsongs.index(self.activesong)]['mp3_path'])
                 songmp3 = pygame.mixer.Sound(self.songdata[self.allsongs.index(self.activesong)]['mp3_path'])
@@ -407,7 +409,7 @@ class MUSIC:
         ## volume control
         ui.makeslider(0,0,100,12,maxp=1,anchor=('w-10','h-46'),objanchor=('w','h/2'),border=1,roundedcorners=4,button=ui.makebutton(0,0,'',width=20,height=20,clickdownsize=0,borderdraw=False,backingdraw=False,runcommandat=1,command=self.setvolume,ID='volume button'),movetoclick=True,scalesize=False,col=(131,243,216),backingcol=(16,163,127),startp=self.storevolume,ID='volume',layer=5)
         ui.makebutton(0,0,'{speaker}',20,anchor=('w-120','h-46'),objanchor=('w','h/2'),roundedcorners=10,scalesize=False,clickdownsize=2,spacing=4,toggleable=True,togglecol=(16,163,127),toggletext='{mute}',command=self.mutetoggle,ID='mute button',layer=5)
-        ui.makebutton(0,0,'{shuffle}{tick}',20,anchor=('w-165','h-46'),objanchor=('w','h/2'),roundedcorners=10,scalesize=False,clickdownsize=2,spacing=4,toggleable=True,togglecol=(16,163,127),toggletext='{shuffle}{cross}',command=self.mutetoggle,ID='shuffle button',layer=5,width=60,height=35)
+        ui.makebutton(0,0,'{shuffle}',20,self.generatequeue,anchor=('w-162','h-46'),objanchor=('w','h/2'),roundedcorners=10,scalesize=False,clickdownsize=1,spacing=4,toggleable=True,toggletext='{shuffle (16,180,107)}',ID='shuffle button',layer=5,width=35,height=35,backingdraw=False,borderdraw=False)
 
 
         ## song title/image
@@ -485,8 +487,7 @@ class MUSIC:
         ui.maketextbox(10,10,'',580,menu='download new',commandifenter=True,height=30,scalesize=False,textsize=28,verticalspacing=2,roundedcorners=5,col=(63,64,75),layer=3,borderdraw=True,leftborder=80,rightborder=56,command=self.searchyoutube,ID='search bar')
         ui.maketable(10,50,[],['Image','Title',''],'download new',roundedcorners=5,verticalspacing=3,col=(6,64,75),boxwidth=[110,362,100],boxheight=[25],textsize=25,scalesize=False,ID='search table',guessheight=84)
         
-
-        
+  
     def setsongtime(self):
         if ui.IDs['song duration button'].clickedon == 2 and self.activesong!=-1:
             self.missedtime = ui.IDs['song duration'].slider-pygame.mixer.music.get_pos()/1000
@@ -522,7 +523,11 @@ class MUSIC:
         self.playpause()
     def queueselected(self):
         self.queue.insert(0,self.selected)
+        self.refreshqueue()
         ui.menuback()
+    def refreshqueue(self):
+        if self.activeplaylist == 1:
+            self.refreshsongtable()
     def shiftsongtable(self):
         ui.IDs['playlist'].y = 100-ui.IDs['scroller'].scroll
         ui.IDs['playlist'].refreshcords(ui)
