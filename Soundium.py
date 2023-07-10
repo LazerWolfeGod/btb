@@ -199,19 +199,21 @@ def readdat(path):
     return info
 
 def makeplst(pl):
-    path = pyui.resourcepath(f'data\\playlists\\{pl[1]}.plst')
+    path = pyui.resourcepath(f'data\\playlists\\{makefileable(pl[1])}.plst')
     with open(path,'w') as f:
+        f.write(pl[1]+'\n')
         for a in pl[0]:
             f.write(f'{a}\n')
 def readplst(title='',path=''):
     if path == '':
-        path = pyui.resourcepath(f'data\\playlists\\{title}.plst')
-    if title == '':
-        title = path.split('\\')[-1].removesuffix('.plst')
+        path = pyui.resourcepath(f'data\\playlists\\{makefileable(title)}.plst')
+##    if title == '':
+##        title = path.split('\\')[-1].removesuffix('.plst')
     pl = []
     with open(path,'r') as f:
         data = f.readlines()
-    for a in data:
+    title = data[0].removesuffix('\n')
+    for a in data[1:]:
         pl.append(a.removesuffix('\n'))
     return [pl,title]
     
@@ -246,6 +248,7 @@ class MUSIC:
         self.loadmusic()
         self.loadplaylists()
         self.activeplaylist = 0
+        self.playingplaylist = 0
         self.activesong = -1
         self.generatequeue()
         self.songhistory = []
@@ -303,16 +306,16 @@ class MUSIC:
             self.playlists.append(readplst(path=a))
     def generatequeue(self):
         if 'shuffle button' in ui.IDs and ui.IDs['shuffle button'].toggle:
-            self.queue = [self.playlists[self.activeplaylist][0][a] for a in range(self.playlists[self.activeplaylist][0].index(self.activesong),len(self.playlists[self.activeplaylist][0]))]
+            self.queue = [self.playlists[self.playingplaylist][0][a] for a in range(self.playlists[self.playingplaylist][0].index(self.activesong),len(self.playlists[self.playingplaylist][0]))]
             random.shuffle(self.queue)
             if self.activesong in self.queue:
                 self.queue.remove(self.activesong)
                 self.queue.insert(0,self.activesong)
         else:
             if self.activesong == -1:
-                self.queue = copy.copy(self.playlists[self.activeplaylist][0])
+                self.queue = copy.copy(self.playlists[self.playingplaylist][0])
             else:
-                self.queue = [self.playlists[self.activeplaylist][0][a] for a in range(self.playlists[self.activeplaylist][0].index(self.activesong),len(self.playlists[self.activeplaylist][0]))]
+                self.queue = [self.playlists[self.playingplaylist][0][a] for a in range(self.playlists[self.playingplaylist][0].index(self.activesong),len(self.playlists[self.playingplaylist][0]))]
         self.refreshqueue()
     def nextsong(self):
         pygame.mixer.music.unload()
@@ -326,7 +329,7 @@ class MUSIC:
             while len(self.queue)>0 and not(self.songdata[self.allsongs.index(self.activesong)]['downloaded']):
                 self.activesong = self.queue[0]
                 del self.queue[0]
-                self.refreshqueue()
+            self.refreshqueue()
             if self.songdata[self.allsongs.index(self.activesong)]['downloaded']:
                 pygame.mixer.music.load(self.songdata[self.allsongs.index(self.activesong)]['mp3_path'])
                 songmp3 = pygame.mixer.Sound(self.songdata[self.allsongs.index(self.activesong)]['mp3_path'])
@@ -426,7 +429,7 @@ class MUSIC:
         ui.maketable(160,100,[],titles,ID='playlist',boxwidth=[70,wid,wid,wid,70],boxheight=[40],backingdraw=True,textsize=20,verticalspacing=4,textcenter=False,col=(62,63,75),scalesize=False,scalex=False,scaley=False,roundedcorners=4,clickablerect=pygame.Rect(160,100,4000,screenh-193),guessheight=70)
         self.refreshsongtable(False,False)
         ui.makerect(156,0,3000,100,col=(62,63,75),scalesize=False,scalex=False,scaley=False,layer=2,ID='title backing')
-        ui.maketext(0,5,self.playlists[self.activeplaylist][1],80,anchor=('(w-175)/2+160',0),center=True,centery=False,scalesize=False,scalex=False,scaley=False,ID='playlist name',layer=3,backingcol=(62,63,75))
+        ui.maketext(0,0,self.playlists[self.activeplaylist][1],80,anchor=('(w-175)/2+160',36),center=True,scalesize=False,scalex=False,scaley=False,ID='playlist name',layer=3,backingcol=(62,63,75))
         ui.maketext(0,65,str(len(self.playlists[self.activeplaylist][0]))+' songs',30,anchor=('(w-175)/2+160',0),center=True,centery=False,scalesize=False,scalex=False,scaley=False,ID='playlist info',layer=3,backingcol=(62,63,75))
         ui.makescroller(0,0,screenh-193,self.shiftsongtable,maxp=ui.IDs['playlist'].height,pageheight=screenh-200,anchor=('w',100),objanchor=('w',0),ID='scroller',scalesize=False,scalex=False,scaley=False,runcommandat=1)
             
@@ -513,6 +516,7 @@ class MUSIC:
         else:
             pygame.mixer.music.pause()
     def playselected(self,selected=''):
+        self.playingplaylist = self.activeplaylist
         ui.IDs['playpause button'].toggle = True
         if selected=='':
             ui.menuback()
@@ -539,9 +543,14 @@ class MUSIC:
         else:
             self.refreshsongtable2(scroller)
     def refreshsongtable2(self,scroller):
-        self.playlists[1] = [self.queue[:30],self.playlists[1][1]]
+        tempqueue = []
+        count = 0
+        while len(tempqueue)<30 and count != len(self.queue):
+            if self.songdata[self.allsongs.index(self.queue[count])]['downloaded']:
+                tempqueue.append(self.queue[count])
+            count+=1
+        self.playlists[1] = [tempqueue,self.playlists[1][1]]
         self.playlists[2] = [self.songhistory[:30],self.playlists[2][1]]
-        
         ui.IDs['playlist'].disable()
         ui.IDs['playlist'].wipe(ui,False)
         data = []
@@ -653,7 +662,7 @@ class MUSIC:
         ui.movemenu('song info','down')
     def addmenu(self,download=False):
         data = []
-        for a in range(1,len(self.playlists)):
+        for a in range(3,len(self.playlists)):
             func = funceram(self.playlists[a][1],self)
             data.append([ui.makebutton(0,0,self.playlists[a][1],25,clickdownsize=1,roundedcorners=4,verticalspacing=4,command=func.func)])
         ui.IDs['playlist add'].data = data
@@ -662,7 +671,7 @@ class MUSIC:
         ui.IDs['add menu'].height = ui.IDs['playlist add'].height+10
         ui.movemenu('add menu','down')
     def plsteditmenu(self):
-        if self.activeplaylist!=0:
+        if self.activeplaylist>2:
             ui.IDs['inputinfo plstname'].text = self.playlists[self.activeplaylist][1]
             ui.IDs['inputinfo plstname'].refresh(ui)
             ui.movemenu('plstedit menu','down')
@@ -674,7 +683,8 @@ class MUSIC:
         name = ui.IDs['inputinfo plstname'].text
         old = self.playlists[self.activeplaylist][1]
         self.playlists[self.activeplaylist][1] = name
-        os.rename(pyui.resourcepath(f'data\\playlists\\{old}.plst'),pyui.resourcepath(f'data\\playlists\\{name}.plst'))
+        os.remove(f'data\\playlists\\{makefileable(old)}.plst')
+        makeplst(self.playlists[self.activeplaylist])
         self.refreshplaylisttable()
         self.refreshplaylistdisplay()
         ui.menuback()
