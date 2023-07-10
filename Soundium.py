@@ -5,6 +5,11 @@ from bs4 import BeautifulSoup
 pygame.init()
 screenw = 800
 screenh = 600
+logo = pygame.image.load(pyui.resourcepath('soundium_icon black.png'))
+logo.set_colorkey((0,0,0))
+logow = pygame.image.load(pyui.resourcepath('soundium_icon white.png'))
+logow.set_colorkey((255,255,255))
+pygame.display.set_icon(logow)
 screen = pygame.display.set_mode((screenw, screenh),pygame.RESIZABLE)
 pygame.display.set_caption('Soundium')
 pygame.scrap.init()
@@ -97,11 +102,18 @@ def spotifyplaylistpull(link):
     return [[readdat(a)['dat_path'] for a in files],data['name']]
 
 def downloadyoutube(url,name,music,refresh=True):
+    print('downloading',name)
     yt = pytube.YouTube(url)
     audio = yt.streams.filter(only_audio=True).first()
     mp3 = audio.download(pyui.resourcepath(''),'temp.mp3')
+    path = pyui.resourcepath(f"data\\mp3s\\{name}.mp3")
+    print('to',path)
     os.system("cd "+pyui.resourcepath(''))
-    os.system(f'ffmpeg -i temp.mp3 -vn -ar 44100 -ac 1 -b:a 32k -f mp3 "data\\mp3s\\{name}.mp3"')
+    print('ffmpeg in path',pyui.resourcepath('assets'))
+    print('temp.mp3 in path',pyui.resourcepath("temp.mp3"))
+    print('saved to',path)
+    os.system(f'ffmpeg -i "temp.mp3" -vn -ar 44100 -ac 1 -b:a 32k -f mp3 "{path}"')
+    print('saved')
     if refresh:
         if music.selected == -1:
             music.scanmp3s(f'http://img.youtube.com/vi/{url.split("=")[-1]}/0.jpg')
@@ -305,12 +317,11 @@ class MUSIC:
         for a in files:
             self.playlists.append(readplst(path=a))
     def generatequeue(self):
-        if 'shuffle button' in ui.IDs and ui.IDs['shuffle button'].toggle:
-            self.queue = [self.playlists[self.playingplaylist][0][a] for a in range(self.playlists[self.playingplaylist][0].index(self.activesong),len(self.playlists[self.playingplaylist][0]))]
+        if ('shuffle button' in ui.IDs) and not ui.IDs['shuffle button'].toggle:
+            self.queue = [self.playlists[self.playingplaylist][0][a] for a in range(0,len(self.playlists[self.playingplaylist][0]))]
             random.shuffle(self.queue)
             if self.activesong in self.queue:
                 self.queue.remove(self.activesong)
-                self.queue.insert(0,self.activesong)
         else:
             if self.activesong == -1:
                 self.queue = copy.copy(self.playlists[self.playingplaylist][0])
@@ -340,10 +351,12 @@ class MUSIC:
                 if not self.playing:
                     pygame.mixer.music.pause()
             else:
-                ui.IDs['playpause button'].toggle = False
+                if 'playpause button' in ui.IDs: ui.IDs['playpause button'].toggle = False
+                self.playing = False
                 self.activesong = -1
         else:
-            ui.IDs['playpause button'].toggle = False
+            if 'playpause button' in ui.IDs: ui.IDs['playpause button'].toggle = False
+            self.playing = False
             self.activesong = -1
     def prevsong(self):
         if len(self.songhistory)>0:
@@ -387,12 +400,15 @@ class MUSIC:
             ui.IDs['artist name'].text = self.songdata[self.allsongs.index(self.activesong)]['artist']
             ui.IDs['artist name'].refresh(ui)
             ui.IDs['artist name'].resetcords(ui)
+            ui.IDs['song img'].textsize = 70
             if self.songdata[self.allsongs.index(self.activesong)]['image_path'] != 'none':
-                ui.IDs['song img'].textsize = 70
                 ui.IDs['song img'].img = pygame.image.load(self.songdata[self.allsongs.index(self.activesong)]['image_path'])
-                if ui.IDs['song img'].img.get_width()/ui.IDs['song img'].img.get_height()>1.1: ui.IDs['song img'].textsize*=0.75
+                if ui.IDs['song img'].img.get_width()/ui.IDs['song img'].img.get_height()>1.1:
+                    ui.IDs['song img'].textsize*=0.75
             else:
-                ui.IDs['song img'].img = pyui.loadinganimation(12)
+                ui.IDs['song img'].img = logo
+                ui.IDs['song img'].colorkey = (0,0,0)
+                ui.IDs['song img'].textsize = 58
             ui.IDs['song img'].refresh(ui)
             ui.IDs['song img'].resetcords(ui)
             
@@ -561,7 +577,7 @@ class MUSIC:
                 dat = self.songdata[self.allsongs.index(a)]
                 func = funcerps(a,self)
                 if dat['image_path'] == 'none':
-                    if dat['downloaded']: img = ui.makebutton(-100,-100,'-',20,command=func.func,col=(62,63,75),roundedcorners=4,scalesize=False,enabled=False,border=1,hovercol=pyui.shiftcolor((72,63,75),-5))
+                    if dat['downloaded']: img = ui.makebutton(-100,-100,'',37,command=func.func,col=(62,63,75),img=logo,roundedcorners=4,scalesize=False,enabled=False,border=1,hovercol=pyui.shiftcolor((72,63,75),-5),colorkey=(0,0,0),verticalspacing=3)
                     else: img = ui.maketext(-100,-100,'-',20,col=(62,63,75),roundedcorners=4,textcenter=True,scalesize=False,enabled=False)
                 else:
                     image = pygame.image.load(dat['image_path'])
@@ -569,7 +585,7 @@ class MUSIC:
                     else: txtsize = 64
                     if dat['downloaded']: img = ui.makebutton(-100,-100,'',txtsize,command=func.func,img=image,col=(62,63,75),roundedcorners=4,scalesize=False,enabled=False,verticalspacing=3,border=1)
                     else: img = ui.maketext(-100,-100,'',txtsize,img=image,col=(62,63,75),roundedcorners=4,textcenter=True,scalesize=False,enabled=False)
-                data.append([img,dat['name']+'\n- '+dat['artist'],dat['album'],sectostr(float(dat['length'])),obj])
+                data.append([img,dat['name']+'\n{"- '+dat['artist']+'" (150,150,160)}',dat['album'],sectostr(float(dat['length'])),obj])
         ui.IDs['playlist'].data = data
         ui.IDs['playlist'].refresh(ui)
         if scroller:
@@ -694,14 +710,15 @@ class MUSIC:
         album = ui.IDs['inputinfo album'].text
         image = ui.IDs['inputinfo image'].text
         mp3 = ui.IDs['inputinfo mp3'].text
-        if len(image.split('\\')) == 1:
+        if len(image.split('\\')) == 1 and (image!='none' and image!=''):
             image = pyui.resourcepath(f'data\\images\\{image}')
+        if image == '': image = 'none'
         if len(mp3.split('\\')) == 1:
             mp3 = pyui.resourcepath(f'data\\mp3s\\{mp3}')
         self.songdata[self.allsongs.index(self.selected)]['name'] = name
         self.songdata[self.allsongs.index(self.selected)]['artist'] = artist
         self.songdata[self.allsongs.index(self.selected)]['album'] = album
-        if os.path.isfile(image):
+        if os.path.isfile(image) or image == 'none':
             self.songdata[self.allsongs.index(self.selected)]['image_path'] = image
         if os.path.isfile(mp3):
             self.songdata[self.allsongs.index(self.selected)]['mp3_path'] = mp3
