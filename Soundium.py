@@ -5,9 +5,19 @@ from bs4 import BeautifulSoup
 pygame.init()
 screenw = 800
 screenh = 600
-logo = pygame.image.load(pyui.resourcepath('soundium_icon black.png'))
+
+def resource_path(relative_path):
+    try:
+    # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = sys._MEIPASS
+    except Exception:
+        base_path = os.path.abspath(".")
+
+    return os.path.join(base_path, relative_path)
+
+logo = pygame.image.load(resource_path('assets\\soundium_icon black.png'))
 logo.set_colorkey((0,0,0))
-logow = pygame.image.load(pyui.resourcepath('soundium_icon white.png'))
+logow = pygame.image.load(resource_path('assets\\soundium_icon white.png'))
 logow.set_colorkey((255,255,255))
 pygame.display.set_icon(logow)
 screen = pygame.display.set_mode((screenw, screenh),pygame.RESIZABLE)
@@ -32,22 +42,27 @@ def sectostr(sec):
         return f'{h}:{m}:{s}'
 
 def makefileable(name):
-    special = '\/:*?"<>|'
-    for a in special:
-        name = name.replace(a,'')
+    swaps = {'’':"'"}
+    for a in list(swaps):
+        name = name.replace(a,swaps[a])
+
     nstring = ''
     for a in name:
-        if ord(a)>1000:
+        if ord(a)>126:
             nstring+=asciify(a)
         else:
             nstring+=a
+    
+    special = '\/:*?"<>|'
+    for a in special:
+        nstring = nstring.replace(a,'')
     return nstring
 
 def asciify(text):
     dat = [ord(a) for a in text]
     st = ''
     for a in dat:
-        st+=chr(a%128)
+        st+=chr((a-32)%94+32)
     return st
 
 def loadimage(url,name,thumbnail=False):
@@ -88,10 +103,18 @@ def spotifyplaylistpull(link):
     print('---loading spotify')
     try:
         data = sp.playlist(link)
+        fulltracks = sp.playlist_tracks(link,limit=100)
+        lenn = len(fulltracks['items'])
+        while lenn != 0:
+            extendor = sp.playlist_tracks(link,limit=100,offset=len(fulltracks['items']))
+            fulltracks['items'] += extendor['items']
+            lenn = len(extendor['items'])
+        data['tracks'] = fulltracks
     except:
         print('invalid link')
         return 0
     songdata = []
+    print(len(data['tracks']['items']))
     for a in data['tracks']['items']:
         songdata.append(songdatapull(a['track']))
     files = []
@@ -107,13 +130,8 @@ def downloadyoutube(url,name,music,refresh=True):
     audio = yt.streams.filter(only_audio=True).first()
     mp3 = audio.download(pyui.resourcepath(''),'temp.mp3')
     path = pyui.resourcepath(f"data\\mp3s\\{name}.mp3")
-    print('to',path)
     os.system("cd "+pyui.resourcepath(''))
-    print('ffmpeg in path',pyui.resourcepath('assets'))
-    print('temp.mp3 in path',pyui.resourcepath("temp.mp3"))
-    print('saved to',path)
-    os.system(f'ffmpeg -i "temp.mp3" -vn -ar 44100 -ac 1 -b:a 32k -f mp3 "{path}"')
-    print('saved')
+    os.system(f'ffmpeg -i "temp.mp3" -ab 160k -f mp3 "{path}"')
     if refresh:
         if music.selected == -1:
             music.scanmp3s(f'http://img.youtube.com/vi/{url.split("=")[-1]}/0.jpg')
@@ -263,8 +281,7 @@ class MUSIC:
         self.playingplaylist = 0
         self.activesong = -1
         self.generatequeue()
-        self.songhistory = []
-        self.nextsong()
+        self.loadhistory()
 
         self.makegui()
 
@@ -316,6 +333,17 @@ class MUSIC:
         files = [pyui.resourcepath('data\\playlists\\'+f) for f in os.listdir(pyui.resourcepath('data\\playlists')) if f[len(f)-5:]=='.plst']
         for a in files:
             self.playlists.append(readplst(path=a))
+    def loadhistory(self):
+        self.songhistory = []
+        if not os.path.isfile(pyui.resourcepath('data\\history.txt')):
+            with open(pyui.resourcepath('data\\history.txt'),'w'):
+                pass
+        with open(pyui.resourcepath('data\\history.txt'),'r') as fl:
+            lines = fl.readlines()
+        for a in lines:
+            self.songhistory.append(a.split(' ',1)[1])
+        
+        
     def generatequeue(self):
         if ('shuffle button' in ui.IDs) and not ui.IDs['shuffle button'].toggle:
             self.queue = [self.playlists[self.playingplaylist][0][a] for a in range(0,len(self.playlists[self.playingplaylist][0]))]
@@ -334,6 +362,8 @@ class MUSIC:
         self.realtime = 0
         if self.activesong != -1:
             self.songhistory.append(self.songdata[self.allsongs.index(self.activesong)]['dat_path'])
+            with open(pyui.resourcepath('data\\history.txt'),'a') as f:
+                f.write(f"{time.time()} {self.songdata[self.allsongs.index(self.activesong)]['dat_path']}\n")
         if len(self.queue)!=0:
             self.activesong = self.queue[0]
             del self.queue[0]
@@ -679,8 +709,9 @@ class MUSIC:
     def addmenu(self,download=False):
         data = []
         for a in range(3,len(self.playlists)):
-            func = funceram(self.playlists[a][1],self)
-            data.append([ui.makebutton(0,0,self.playlists[a][1],25,clickdownsize=1,roundedcorners=4,verticalspacing=4,command=func.func)])
+            if self.playlists[a][1][len(self.playlists[a][1]-5):] != '%del%':
+                func = funceram(self.playlists[a][1],self)
+                data.append([ui.makebutton(0,0,self.playlists[a][1],25,clickdownsize=1,roundedcorners=4,verticalspacing=4,command=func.func)])
         ui.IDs['playlist add'].data = data
         ui.IDs['playlist add'].refresh(ui)
         ui.IDs['playlist add'].refreshcords(ui)
@@ -739,7 +770,7 @@ class MUSIC:
     def downloadsong(self):
         info = self.songdata[self.allsongs.index(self.selected)]
         ui.movemenu('download new','down')
-        ui.IDs['search bar'].text = asciify(info['name']+' '+info['artist'])
+        ui.IDs['search bar'].text = asciify(info['name']+' - '+info['artist'])
         ui.IDs['search bar'].refresh(ui)
         self.searchyoutube()
     def downloadplaylist(self):
