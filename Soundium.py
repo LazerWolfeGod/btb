@@ -143,6 +143,7 @@ def downloadyoutube(url,name,music,refresh=True):
             makedat(music.songdata[music.allsongs.index(music.selected)],True)
         music.loadmusic()
         music.loadplaylists()
+        music.addtoplaylist(music.activeplaylist,pyui.resourcepath(f"data\\songs\\{name}.dat"))
         music.refreshsongtable(True,True)
         music.awaitingthreads['download youtube'][0] = True
 
@@ -516,7 +517,8 @@ class MUSIC:
         ui.makewindowedmenu(160,10,600,99,'plstedit menu','main',col=(52,53,65),scalesize=False,scalex=False,scaley=False,roundedcorners=10,colorkey=(2,2,2),ID='plstedit menu')
         ui.maketable(5,5,[['Name',ui.maketextbox(0,0,'',400,10,height=50,roundedcorners=2,textsize=30,col=(62,63,75),ID='inputinfo plstname',linelimit=10,verticalspacing=2,command=self.saveplstinfo,commandifenter=True)]],menu='plstedit menu',roundedcorners=4,boxwidth=[84,500],boxheight=50,textsize=30,scalesize=False,scalex=False,scaley=False,verticalspacing=3,col=(62,63,75),ID='plstedit table')
         ui.makebutton(300,64,'Save',30,self.saveplstinfo,'plstedit menu',roundedcorners=8,spacing=2,horizontalspacing=14,center=True,centery=False,clickdownsize=2,scalesize=False,scalex=False,scaley=False)
-        ui.makebutton(595,94,'Delete',30,self.deleteplst,'plstedit menu',roundedcorners=8,spacing=2,horizontalspacing=14,objanchor=('w','h'),clickdownsize=2,scalesize=False,scalex=False,scaley=False,col=(180,60,60))
+        ui.makebutton(508,94,'Remove',30,self.deleteplst,'plstedit menu',roundedcorners=8,spacing=2,horizontalspacing=4,objanchor=('w','h'),clickdownsize=2,scalesize=False,scalex=False,scaley=False,col=(180,60,100))
+        ui.makebutton(595,94,'ERASE',30,self.eraseplst,'plstedit menu',roundedcorners=8,spacing=2,horizontalspacing=4,objanchor=('w','h'),clickdownsize=2,scalesize=False,scalex=False,scaley=False,col=(180,60,60))
         
         ## downloading playlist
         ui.makebutton(159,5,'{arrow stick=0.4 point=0.2 down}',30,command=self.downloadplaylist,layer=3,roundedcorners=10,spacing=5,clickdownsize=2,width=40,height=40,textoffsetx=1,scalesize=False)
@@ -607,7 +609,7 @@ class MUSIC:
                 dat = self.songdata[self.allsongs.index(a)]
                 func = funcerps(a,self)
                 if dat['image_path'] == 'none':
-                    if dat['downloaded']: img = ui.makebutton(-100,-100,'',37,command=func.func,col=(62,63,75),img=logo,roundedcorners=4,scalesize=False,enabled=False,border=1,hovercol=pyui.shiftcolor((72,63,75),-5),colorkey=(0,0,0),verticalspacing=3)
+                    if dat['downloaded']: img = ui.makebutton(-100,-100,'',37,command=func.func,col=(62,63,75),img=logo,roundedcorners=4,scalesize=False,enabled=False,border=1,hovercol=pyui.shiftcolor((72,63,75),-5),verticalspacing=3)
                     else: img = ui.maketext(-100,-100,'-',20,col=(62,63,75),roundedcorners=4,textcenter=True,scalesize=False,enabled=False)
                 else:
                     image = pygame.image.load(dat['image_path'])
@@ -652,6 +654,8 @@ class MUSIC:
             makeplst(pl)
             self.moveplaylist(len(self.playlists)-1)
             self.refreshplaylisttable()
+            self.loadmusic()
+            self.loadplaylists()
     def getinput(self,ID):
         self.input = input('Enter your spotify link: ')
         self.awaitingthreads[ID][0] = True
@@ -674,15 +678,34 @@ class MUSIC:
         ui.IDs['playlist info'].text = str(len(self.playlists[self.activeplaylist][0]))+' songs'
         ui.IDs['playlist info'].refresh(ui)
         ui.IDs['playlist info'].resetcords(ui)
-    def addtoplaylist(self,playlist):
-        self.playlists[[a[1] for a in self.playlists].index(playlist)][0].append(self.selected)
-        makeplst(self.playlists[[a[1] for a in self.playlists].index(playlist)])
-        ui.menuback()
+    def addtoplaylist(self,playlist,song=-1):
+        back = False
+        if song == -1:
+            song = self.selected
+            back = True
+        if type(playlist) == str: playlist = [a[1] for a in self.playlists].index(playlist)
+        self.playlists[playlist][0].append(song)
+        makeplst(self.playlists[playlist])
+        if back: ui.menuback()
     def removesong(self):
         ui.menuback()
         if self.activeplaylist != 0:
             self.playlists[self.activeplaylist][0].remove(self.selected)
             makeplst(self.playlists[self.activeplaylist])
+            self.refreshsongtable()
+        else:
+            index = self.allsongs.index(self.selected)
+            mp3 = self.songdata[index]['mp3_path']
+            if os.path.isfile(mp3): os.remove(mp3)
+            os.remove(self.selected)
+            for a in range(len(self.playlists)):
+                if not(a in [1,2]):
+                    while self.selected in self.playlists[a]:
+                        self.playlists[a].remove(self.selected)
+            del self.songdata[index]
+            del self.allsongs[index]
+            print('wiped:',self.selected)
+            self.saveplstinfo()
             self.refreshsongtable()
     def controlmenu(self,song):
         self.selected = song
@@ -726,6 +749,30 @@ class MUSIC:
         ui.IDs['inputinfo plstname'].text = self.playlists[self.activeplaylist][1]+'%del%'
         self.saveplstinfo()
         self.moveplaylist(0)
+    def eraseplst(self):
+        songs = self.playlists[self.activeplaylist][0][:]
+        elsesongs = []
+        for a in range(len(self.playlists)):
+            if a>2 and a!=self.activeplaylist:
+                for b in self.playlists[a][0]:
+                    if not(b in elsesongs):
+                        elsesongs.append(b)
+        for a in songs:
+            if not(a in elsesongs) and os.path.isfile(a):
+                os.remove(a)
+                index = self.allsongs.index(a)
+                mp3 = self.songdata[index]['mp3_path']
+                if os.path.isfile(mp3): os.remove(mp3)
+                del self.songdata[index]
+                del self.allsongs[index]
+                print('wiped:',a)
+        os.remove(pyui.resourcepath(f'data\\playlists\\{self.playlists[self.activeplaylist][1]}.plst'))
+        del self.playlists[self.activeplaylist]
+        self.moveplaylist(0)
+        self.refreshplaylisttable()
+        self.refreshplaylistdisplay()
+
+        
     def saveplstinfo(self):
         name = ui.IDs['inputinfo plstname'].text
         old = self.playlists[self.activeplaylist][1]
