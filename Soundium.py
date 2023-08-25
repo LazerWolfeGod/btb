@@ -1,4 +1,4 @@
-import pygame,time,math,random,sys,os,copy,requests,threading,urllib,re,pytube
+import pygame,time,random,sys,os,copy,requests,threading,urllib,re,pytube
 import PyUI as pyui
 from bs4 import BeautifulSoup
 ##pygame.mixer.pre_init(44100, 16, 2, 4096)
@@ -64,6 +64,10 @@ def asciify(text):
     for a in dat:
         st+=chr((a-32)%94+32)
     return st
+
+def cleanprint(songs):
+    for a in songs:
+        print(a.split('\\')[-1].removesuffix('.dat'))
 
 def loadimage(url,name,thumbnail=False):
     if thumbnail:
@@ -135,6 +139,8 @@ def downloadyoutube(url,name,music,refresh=True):
     if refresh:
         if music.selected == -1:
             music.scanmp3s(f'http://img.youtube.com/vi/{url.split("=")[-1]}/0.jpg')
+            if not(music.activeplaylist in [0,1,2]):
+                music.addtoplaylist(music.activeplaylist,pyui.resourcepath(f"data\\songs\\{name}.dat"))
         else:
             music.songdata[music.allsongs.index(music.selected)]['mp3_path'] = pyui.resourcepath(f'data\\mp3s\\{name}.mp3')
             music.songdata[music.allsongs.index(music.selected)]['downloaded'] = True
@@ -143,7 +149,6 @@ def downloadyoutube(url,name,music,refresh=True):
             makedat(music.songdata[music.allsongs.index(music.selected)],True)
         music.loadmusic()
         music.loadplaylists()
-        music.addtoplaylist(music.activeplaylist,pyui.resourcepath(f"data\\songs\\{name}.dat"))
         music.refreshsongtable(True,True)
         music.awaitingthreads['download youtube'][0] = True
 
@@ -152,14 +157,18 @@ def fullautodownload(download):
         print(f'downloading {song["name"]} {i+1}/{len(download)}')
         term = asciify(f'{song["name"]} {song["artist"]}'.replace(' ','+'))
         html = urllib.request.urlopen(f'https://www.youtube.com/results?search_query="{term}"')
-        url = re.findall(r'watch\?v=(\S{11})',html.read().decode())[0]
-        name = song['name']+'-'+song['artist']
-        downloadyoutube('https://www.youtube.com/watch?v='+url,name,music,False)
-        song['mp3_path'] = pyui.resourcepath(f'data\\mp3s\\{name}.mp3')
-        song['downloaded'] = True
-        songmp3 = pygame.mixer.Sound(song['mp3_path'])
-        song['length'] = songmp3.get_length()
-        makedat(song,True)
+        items = re.findall(r'watch\?v=(\S{11})',html.read().decode())
+        if len(items)>0:
+            url = items[0]
+            name = song['name']+'-'+song['artist']
+            downloadyoutube('https://www.youtube.com/watch?v='+url,name,music,False)
+            song['mp3_path'] = pyui.resourcepath(f'data\\mp3s\\{name}.mp3')
+            song['downloaded'] = True
+            songmp3 = pygame.mixer.Sound(song['mp3_path'])
+            song['length'] = songmp3.get_length()
+            makedat(song,True)
+        else:
+            print('FAILED TO DOWNLOAD',song['name'])
     music.loadmusic()
     music.loadplaylists()
     music.refreshsongtable(True,True)
@@ -342,29 +351,29 @@ class MUSIC:
         with open(pyui.resourcepath('data\\history.txt'),'r') as fl:
             lines = fl.readlines()
         for a in lines:
-            self.songhistory.append(a.split(' ',1)[1])
+            self.songhistory.append(a.split(' ',1)[1].removesuffix('\n'))
+        self.songhistory.reverse()
         
         
-    def generatequeue(self):
-        if ('shuffle button' in ui.IDs) and not ui.IDs['shuffle button'].toggle:
-            self.queue = [self.playlists[self.playingplaylist][0][a] for a in range(0,len(self.playlists[self.playingplaylist][0]))]
-            random.shuffle(self.queue)
-            if self.activesong in self.queue:
-                self.queue.remove(self.activesong)
+    def generatequeue(self,ref=True,shufflet=False):
+        if self.activeplaylist == 1 and not shufflet:
+            self.queue = self.queue[self.queue.index(self.activesong):]
         else:
-            if self.activesong == -1:
-                self.queue = copy.copy(self.playlists[self.playingplaylist][0])
+            if ('shuffle button' in ui.IDs) and not ui.IDs['shuffle button'].toggle:
+                self.queue = [self.playlists[self.playingplaylist][0][a] for a in range(0,len(self.playlists[self.playingplaylist][0]))]
+                random.shuffle(self.queue)
+                if self.activesong in self.queue:
+                    self.queue.remove(self.activesong)
             else:
-                self.queue = [self.playlists[self.playingplaylist][0][a] for a in range(self.playlists[self.playingplaylist][0].index(self.activesong),len(self.playlists[self.playingplaylist][0]))]
-        self.refreshqueue()
+                if self.activesong == -1:
+                    self.queue = copy.copy(self.playlists[self.playingplaylist][0])
+                else:
+                    self.queue = [self.playlists[self.playingplaylist][0][a] for a in range(self.playlists[self.playingplaylist][0].index(self.activesong),len(self.playlists[self.playingplaylist][0]))]
+        if ref: self.refreshqueue()
     def nextsong(self):
         pygame.mixer.music.unload()
         self.missedtime = 0
         self.realtime = 0
-        if self.activesong != -1:
-            self.songhistory.append(self.songdata[self.allsongs.index(self.activesong)]['dat_path'])
-            with open(pyui.resourcepath('data\\history.txt'),'a') as f:
-                f.write(f"{time.time()} {self.songdata[self.allsongs.index(self.activesong)]['dat_path']}\n")
         if len(self.queue)!=0:
             self.activesong = self.queue[0]
             del self.queue[0]
@@ -381,6 +390,10 @@ class MUSIC:
                 pygame.mixer.music.play()
                 if not self.playing:
                     pygame.mixer.music.pause()
+                self.songhistory.insert(0,self.songdata[self.allsongs.index(self.activesong)]['dat_path'])
+                with open(pyui.resourcepath('data\\history.txt'),'a') as f:
+                    f.write(f"{time.time()} {self.songdata[self.allsongs.index(self.activesong)]['dat_path']}\n")
+                self.refreshhistory()
             else:
                 if 'playpause button' in ui.IDs: ui.IDs['playpause button'].toggle = False
                 self.playing = False
@@ -459,7 +472,7 @@ class MUSIC:
         ## volume control
         ui.makeslider(0,0,100,12,maxp=1,anchor=('w-10','h-46'),objanchor=('w','h/2'),border=1,roundedcorners=4,button=ui.makebutton(0,0,'',width=20,height=20,clickdownsize=0,borderdraw=False,backingdraw=False,runcommandat=1,command=self.setvolume,ID='volume button'),movetoclick=True,scalesize=False,col=(131,243,216),backingcol=(16,163,127),startp=self.storevolume,ID='volume',layer=5)
         ui.makebutton(0,0,'{speaker}',20,anchor=('w-120','h-46'),objanchor=('w','h/2'),roundedcorners=10,scalesize=False,clickdownsize=2,spacing=4,toggleable=True,togglecol=(16,163,127),toggletext='{mute}',command=self.mutetoggle,ID='mute button',layer=5)
-        ui.makebutton(0,0,'{shuffle}',20,self.generatequeue,anchor=('w-162','h-46'),objanchor=('w','h/2'),roundedcorners=10,scalesize=False,clickdownsize=1,spacing=4,toggleable=True,toggletext='{shuffle (16,180,107)}',ID='shuffle button',layer=5,width=35,height=35,backingdraw=False,borderdraw=False)
+        ui.makebutton(0,0,'{shuffle}',20,lambda: self.generatequeue(shufflet=True),anchor=('w-162','h-46'),objanchor=('w','h/2'),roundedcorners=10,scalesize=False,clickdownsize=1,spacing=4,toggleable=True,toggletext='{shuffle (16,180,107)}',ID='shuffle button',layer=5,width=35,height=35,backingdraw=False,borderdraw=False)
 
 
         ## song title/image
@@ -527,14 +540,12 @@ class MUSIC:
         ui.maketext(150,40,'x Songs from playlist?',35,'download playlist',ID='download playlist text',objanchor=('w/2',0),backingcol=(63,64,75),textcenter=True,scalesize=False)
         ui.makebutton(150,80,'Download',40,self.fullautodownload,'download playlist',ID='download playlist button',objanchor=('w/2',0),roundedcorners=5,verticalspacing=5,scalesize=False)
         
-
-
         ## download new
         ui.makebutton(204,5,'{search}',24,command=self.downloadnew,layer=3,roundedcorners=10,spacing=5,clickdownsize=2,width=40,height=40,textoffsetx=1,scalesize=False)
         ui.makewindowedmenu(0,0,600,519,'download new','main',(63,64,75),anchor=('w/2','h/2'),objanchor=('w/2','h/2'),roundedcorners=10,colorkey=(11,183,2),scalesize=False)
         ui.maketext(13,26,'Search',30,'download new',scalesize=False,layer=4,objanchor=(0,'h/2'),backingcol=(43,44,55))
         ui.makebutton(-46,25,'{search}',18,menu='download new',scalesize=False,objanchor=(0,'h/2'),anchor=('580',0),layer=4,spacing=2,clickdownsize=1,roundedcorners=9,col=(63,64,75),borderdraw=False,hovercol=(59,60,71),command=self.searchyoutube)
-        ui.makebutton(-20,25,'{cross}',16,menu='download new',scalesize=False,objanchor=(0,'h/2'),anchor=('580',0),layer=4,spacing=2,clickdownsize=1,roundedcorners=9,col=(63,64,75),borderdraw=False,hovercol=(59,60,71),width=30,height=30,textoffsetx=1,textoffsety=1)
+        ui.makebutton(-20,25,'{cross}',16,menu='download new',scalesize=False,objanchor=(0,'h/2'),anchor=('580',0),layer=4,spacing=2,clickdownsize=1,roundedcorners=9,col=(63,64,75),borderdraw=False,hovercol=(59,60,71),width=30,height=30,textoffsetx=1,textoffsety=1,command=self.clearsearch)
         ui.maketextbox(10,10,'',580,menu='download new',commandifenter=True,height=30,scalesize=False,textsize=28,verticalspacing=2,roundedcorners=5,col=(63,64,75),layer=3,borderdraw=True,leftborder=80,rightborder=56,command=self.searchyoutube,ID='search bar')
         ui.maketable(10,50,[],['Image','Title',''],'download new',roundedcorners=5,verticalspacing=3,col=(6,64,75),boxwidth=[110,362,100],boxheight=[25],textsize=25,scalesize=False,ID='search table',guessheight=84)
         
@@ -564,13 +575,14 @@ class MUSIC:
         else:
             pygame.mixer.music.pause()
     def playselected(self,selected=''):
-        self.playingplaylist = self.activeplaylist
         ui.IDs['playpause button'].toggle = True
         if selected=='':
             ui.menuback()
             selected = self.selected
+        if self.activeplaylist != 1:
+            self.playingplaylist = self.activeplaylist
         self.activesong = selected
-        self.generatequeue()
+        self.generatequeue(False)
         self.nextsong()
         self.playpause()
     def queueselected(self):
@@ -580,15 +592,21 @@ class MUSIC:
     def refreshqueue(self):
         if self.activeplaylist == 1:
             self.refreshsongtable()
+    def refreshhistory(self):
+        if self.activeplaylist == 2:
+            self.refreshsongtable()
     def shiftsongtable(self):
         ui.IDs['playlist'].y = 100-ui.IDs['scroller'].scroll
         ui.IDs['playlist'].refreshcords(ui)
     def refreshsongtable(self,thread=True,scroller=True):
-        self.awaitingthreads['songs refresh'] = [False,pyui.emptyfunction]
         if thread:
-            thread = threading.Thread(target=lambda: self.refreshsongtable2(scroller))
-            thread.start()
+            if not 'songs refresh' in self.awaitingthreads:
+                thread = threading.Thread(target=lambda: self.refreshsongtable2(scroller))
+                self.awaitingthreads['songs refresh'] = [False,pyui.emptyfunction]
+                thread.start()
+            
         else:
+            self.awaitingthreads['songs refresh'] = [False,pyui.emptyfunction]
             self.refreshsongtable2(scroller)
     def refreshsongtable2(self,scroller):
         tempqueue = []
@@ -598,7 +616,9 @@ class MUSIC:
                 tempqueue.append(self.queue[count])
             count+=1
         self.playlists[1] = [tempqueue,self.playlists[1][1]]
-        self.playlists[2] = [self.songhistory[:30],self.playlists[2][1]]
+        if self.activesong != -1: temphistory = self.songhistory[1:31]
+        else: temphistory = self.songhistory[:30]
+        self.playlists[2] = [temphistory,self.playlists[2][1]]
         ui.IDs['playlist'].disable()
         ui.IDs['playlist'].wipe(ui,False)
         data = []
@@ -652,10 +672,10 @@ class MUSIC:
             self.loadmusic()
             self.playlists.append(pl)
             makeplst(pl)
-            self.moveplaylist(len(self.playlists)-1)
-            self.refreshplaylisttable()
             self.loadmusic()
             self.loadplaylists()
+            self.refreshplaylisttable()
+            self.moveplaylist(len(self.playlists)-1)
     def getinput(self,ID):
         self.input = input('Enter your spotify link: ')
         self.awaitingthreads[ID][0] = True
@@ -690,9 +710,13 @@ class MUSIC:
     def removesong(self):
         ui.menuback()
         if self.activeplaylist != 0:
-            self.playlists[self.activeplaylist][0].remove(self.selected)
-            makeplst(self.playlists[self.activeplaylist])
-            self.refreshsongtable()
+            if self.activeplaylist == 1:
+                self.queue.remove(self.selected)
+                self.refreshqueue()
+            elif self.activeplaylist>2:
+                self.playlists[self.activeplaylist][0].remove(self.selected)
+                makeplst(self.playlists[self.activeplaylist])
+                self.refreshsongtable()
         else:
             index = self.allsongs.index(self.selected)
             mp3 = self.songdata[index]['mp3_path']
@@ -732,7 +756,7 @@ class MUSIC:
     def addmenu(self,download=False):
         data = []
         for a in range(3,len(self.playlists)):
-            if self.playlists[a][1][len(self.playlists[a][1]-5):] != '%del%':
+            if self.playlists[a][1][len(self.playlists[a][1])-5:] != '%del%':
                 func = funceram(self.playlists[a][1],self)
                 data.append([ui.makebutton(0,0,self.playlists[a][1],25,clickdownsize=1,roundedcorners=4,verticalspacing=4,command=func.func)])
         ui.IDs['playlist add'].data = data
@@ -827,6 +851,9 @@ class MUSIC:
         ui.movemenu('download playlist','down')
     def downloadnew(self):
         ui.movemenu('download new','down')
+    def clearsearch(self):
+        ui.IDs['search bar'].text = ''
+        ui.IDs['search bar'].refresh(ui)
     def searchyoutube(self):
         if not('youtube search' in self.awaitingthreads):
             self.awaitingthreads['youtube search'] = [False,pyui.emptyfunction]
