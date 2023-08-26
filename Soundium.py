@@ -131,6 +131,9 @@ def spotifyplaylistpull(link):
 def downloadyoutube(url,name,music,refresh=True):
     print('downloading',name)
     yt = pytube.YouTube(url)
+    if yt.age_restricted:
+        print('FAILED TO DOWNLOAD',name,': Age Restricted')
+        return False
     audio = yt.streams.filter(only_audio=True).first()
     mp3 = audio.download(pyui.resourcepath(''),'temp.mp3')
     path = pyui.resourcepath(f"data\\mp3s\\{name}.mp3")
@@ -151,6 +154,7 @@ def downloadyoutube(url,name,music,refresh=True):
         music.loadplaylists()
         music.refreshsongtable(True,True)
         music.awaitingthreads['download youtube'][0] = True
+    return True
 
 def fullautodownload(download):
     for i,song in enumerate(download):
@@ -161,14 +165,14 @@ def fullautodownload(download):
         if len(items)>0:
             url = items[0]
             name = song['name']+'-'+song['artist']
-            downloadyoutube('https://www.youtube.com/watch?v='+url,name,music,False)
-            song['mp3_path'] = pyui.resourcepath(f'data\\mp3s\\{name}.mp3')
-            song['downloaded'] = True
-            songmp3 = pygame.mixer.Sound(song['mp3_path'])
-            song['length'] = songmp3.get_length()
-            makedat(song,True)
+            if downloadyoutube('https://www.youtube.com/watch?v='+url,name,music,False):
+                song['mp3_path'] = pyui.resourcepath(f'data\\mp3s\\{name}.mp3')
+                song['downloaded'] = True
+                songmp3 = pygame.mixer.Sound(song['mp3_path'])
+                song['length'] = songmp3.get_length()
+                makedat(song,True)
         else:
-            print('FAILED TO DOWNLOAD',song['name'])
+            print('FAILED TO DOWNLOAD',song['name'],': No Results')
     music.loadmusic()
     music.loadplaylists()
     music.refreshsongtable(True,True)
@@ -889,7 +893,7 @@ class MUSIC:
     def downloadyoutube(self,url,name):
         if not('download youtube' in self.awaitingthreads):
             self.awaitingthreads['download youtube'] = [False,pyui.emptyfunction]
-            thread = threading.Thread(target=downloadyoutube(url,name,self))
+            thread = threading.Thread(target=lambda: downloadyoutube(url,name,self))
             thread.start()
 
     def fullautodownload(self):
