@@ -629,7 +629,7 @@ class MUSIC:
         for a in self.playlists[self.activeplaylist][0]:
             if os.path.isfile(a):
                 func = funcercm(a,self)
-                obj = ui.makebutton(-100,-100,'{dots}',20,command=func.func,col=(62,63,75),clickdownsize=1,roundedcorners=4,enabled=False)
+                obj = ui.makebutton(-100,-100,'{dots}',20,command=func.func,col=(62,63,75),clickdownsize=1,roundedcorners=4,enabled=False,scalesize=False)
                 dat = self.songdata[self.allsongs.index(a)]
                 func = funcerps(a,self)
                 if dat['image_path'] == 'none':
