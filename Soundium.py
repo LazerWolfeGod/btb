@@ -873,10 +873,9 @@ class MUSIC:
                 rem.append(links[a])
         for b in rem:
             links.remove(b)
-        ui.IDs['search table'].wipe(ui)
-        data = []
+        ui.IDs['search table'].wipe(ui,False)
         a = 0
-        while len(data)<min(5,len(links)):
+        while len(ui.IDs['search table'].data)<min(5,len(links)):
             dat = BeautifulSoup(requests.get(f'https://www.youtube.com/watch?v={links[a]}').text,'html.parser')
             title = str(dat.find_all(name='title')[0]).replace('<title>','').replace('</title>','').removesuffix(' - YouTube')
             if not('#' in title):
@@ -885,9 +884,7 @@ class MUSIC:
                 thumbnail = 'thumbnail'+str(random.randint(0,100000000))
                 loadimage(f'http://img.youtube.com/vi/{links[a]}/0.jpg',thumbnail,True)
                 textobj = ui.maketext(-100,-100,'',78,img=pygame.image.load(pyui.resourcepath(f'data\\thumbnails\\{thumbnail}.png')),backingcol=(6,64,75))
-                data.append([textobj,title,obj])
-                ui.IDs['search table'].data = data
-                ui.IDs['search table'].threadrefresh(ui)
+                ui.IDs['search table'].row_append(ui,[textobj,title,obj])
             a+=1        
         self.awaitingthreads['youtube search'][0] = True
     def downloadyoutube(self,url,name):
@@ -924,7 +921,7 @@ while not done:
             wid = int((screenw-315-12)/3)
             ui.IDs['playlist'].boxwidth = [70,wid,wid,wid,70]
             ui.IDs['playlist'].clickablerect = pygame.Rect(160,100,4000,screenh-193)
-            ui.IDs['playlist'].refresh(ui)
+            ui.IDs['playlist'].gettablewidths(ui)
             ui.IDs['playlist'].refreshcords(ui)
         if event.type == pygame.mixer.music.get_endevent():
             music.nextsong()
