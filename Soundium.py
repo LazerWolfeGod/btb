@@ -26,9 +26,8 @@ pygame.scrap.init()
 ui = pyui.UI()
 done = False    
 clock = pygame.time.Clock()
-ui.defaultcol = (16,163,127)
-ui.defaulttextcol = (255,255,255)
-ui.defaultanimationspeed = 20
+ui.setstyle(col=(16,163,127),textcol=(255,255,255),animnbationspeed=20)
+
 
 def sectostr(sec):
     h = int(sec//3600)
@@ -480,7 +479,9 @@ class MUSIC:
 
 
         ## song title/image
+        pyui.Style.animationspeed = 5
         ui.maketext(0,0,'',70,anchor=('50','h-46'),center=True,scalesize=False,img=pyui.loadinganimation(12),ID='song img',layer=5)
+        pyui.Style.animationspeed = 20
         ui.maketext(0,0,'Song',20,anchor=('90','h-45'),objanchor=(0,'h'),backingcol=(32,33,35),maxwidth=200,textcenter=False,scalesize=False,ID='song title',layer=5)
         ui.maketext(0,0,'Artist',15,anchor=('90','h-45'),backingcol=(32,33,35),maxwidth=200,textcol=(220,220,220),scalesize=False,ID='artist name',layer=5)  
         
@@ -756,7 +757,7 @@ class MUSIC:
         ui.IDs['inputinfo album'].refresh(ui)
         ui.IDs['inputinfo image'].refresh(ui)
         ui.IDs['inputinfo mp3'].refresh(ui)
-        ui.movemenu('song info','down')
+        ui.movemenu('song info','up')
     def addmenu(self,download=False):
         data = []
         for a in range(3,len(self.playlists)):
@@ -767,7 +768,7 @@ class MUSIC:
         ui.IDs['playlist add'].refresh(ui)
         ui.IDs['playlist add'].refreshcords(ui)
         ui.IDs['add menu'].height = ui.IDs['playlist add'].height+10
-        ui.movemenu('add menu','down')
+        ui.movemenu('add menu','up')
     def plsteditmenu(self):
         if self.activeplaylist>2:
             ui.IDs['inputinfo plstname'].text = self.playlists[self.activeplaylist][1]
@@ -901,6 +902,7 @@ class MUSIC:
             thread.start()
      
 music = MUSIC()
+
 
 while not done:
     pygameeventget = ui.loadtickdata()
