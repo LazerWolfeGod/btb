@@ -26,7 +26,7 @@ pygame.scrap.init()
 ui = pyui.UI()
 done = False    
 clock = pygame.time.Clock()
-ui.setstyle(col=(16,163,127),textcol=(255,255,255),animnbationspeed=20)
+ui.styleset(col=(16,163,127),textcol=(255,255,255),animantionspeed=20)
 
 
 def sectostr(sec):
@@ -734,7 +734,6 @@ class MUSIC:
             del self.songdata[index]
             del self.allsongs[index]
             print('wiped:',self.selected)
-            self.saveplstinfo()
             self.refreshsongtable()
     def controlmenu(self,song):
         self.selected = song
@@ -875,6 +874,7 @@ class MUSIC:
         for b in rem:
             links.remove(b)
         ui.IDs['search table'].wipe(ui,False)
+        ui.IDs['search table'].refresh(ui)
         a = 0
         while len(ui.IDs['search table'].data)<min(5,len(links)):
             dat = BeautifulSoup(requests.get(f'https://www.youtube.com/watch?v={links[a]}').text,'html.parser')
