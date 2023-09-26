@@ -596,10 +596,10 @@ class MUSIC:
         ui.menuback()
     def refreshqueue(self):
         if self.activeplaylist == 1:
-            self.refreshsongtable()
+            self.refreshsongtable2()
     def refreshhistory(self):
         if self.activeplaylist == 2:
-            self.refreshsongtable()
+            self.refreshsongtable2()
     def shiftsongtable(self):
         ui.IDs['playlist'].y = 100-ui.IDs['scroller'].scroll
         ui.IDs['playlist'].refreshcords(ui)
@@ -613,7 +613,7 @@ class MUSIC:
         else:
             self.awaitingthreads['songs refresh'] = [False,pyui.emptyfunction]
             self.refreshsongtable2(scroller)
-    def refreshsongtable2(self,scroller):
+    def refreshsongtable2(self,scroller=True):
         tempqueue = []
         count = 0
         while len(tempqueue)<30 and count != len(self.queue):
@@ -650,7 +650,8 @@ class MUSIC:
             ui.IDs['scroller'].maxp = ui.IDs['playlist'].height
             ui.IDs['scroller'].refresh(ui)
             self.shiftsongtable()
-        self.awaitingthreads['songs refresh'][0] = True
+        if 'songs refresh' in self.awaitingthreads:
+            self.awaitingthreads['songs refresh'][0] = True
     def refreshplaylisttable(self):
         ui.IDs['playlist table'].wipe(ui)
         data = []
