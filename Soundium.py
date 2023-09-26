@@ -479,9 +479,9 @@ class MUSIC:
 
 
         ## song title/image
-        pyui.Style.animationspeed = 5
-        ui.maketext(0,0,'',70,anchor=('50','h-46'),center=True,scalesize=False,img=pyui.loadinganimation(12),ID='song img',layer=5)
-        pyui.Style.animationspeed = 20
+        ui.styleset(animationspeed = 5)
+        ui.maketext(0,0,'',70,anchor=('50','h-46'),center=True,scalesize=False,img=pyui.loadinganimation(12),ID='song img',layer=5,backingcol=(32,33,35))
+        ui.styleset(animationspeed = 20)
         ui.maketext(0,0,'Song',20,anchor=('90','h-45'),objanchor=(0,'h'),backingcol=(32,33,35),maxwidth=200,textcenter=False,scalesize=False,ID='song title',layer=5)
         ui.maketext(0,0,'Artist',15,anchor=('90','h-45'),backingcol=(32,33,35),maxwidth=200,textcol=(220,220,220),scalesize=False,ID='artist name',layer=5)  
         
