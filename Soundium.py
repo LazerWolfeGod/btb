@@ -580,6 +580,7 @@ class MUSIC:
         else:
             pygame.mixer.music.pause()
     def playselected(self,selected=''):
+        print('play')
         ui.IDs['playpause button'].toggle = True
         if selected=='':
             ui.menuback()
@@ -596,10 +597,10 @@ class MUSIC:
         ui.menuback()
     def refreshqueue(self):
         if self.activeplaylist == 1:
-            self.refreshsongtable2()
+            self.refreshsongtable()
     def refreshhistory(self):
         if self.activeplaylist == 2:
-            self.refreshsongtable2()
+            self.refreshsongtable()
     def shiftsongtable(self):
         ui.IDs['playlist'].y = 100-ui.IDs['scroller'].scroll
         ui.IDs['playlist'].refreshcords(ui)
@@ -922,6 +923,7 @@ while not done:
             ui.IDs['scroller'].pageheight = screenh-200
             ui.IDs['scroller'].refresh(ui)
             wid = int((screenw-315-12)/3)
+            ui.IDs['playlist'].startboxwidth = [70,wid,wid,wid,70]
             ui.IDs['playlist'].boxwidth = [70,wid,wid,wid,70]
             ui.IDs['playlist'].clickablerect = pygame.Rect(160,100,4000,screenh-193)
             ui.IDs['playlist'].gettablewidths(ui)
