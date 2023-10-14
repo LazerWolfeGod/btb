@@ -433,20 +433,14 @@ class MUSIC:
                 if not ui.IDs['song duration button'].holding:
                     ui.IDs['song duration'].slider = self.realtime
                 ui.IDs['songtime'].text = sectostr(self.realtime)
-                ui.IDs['songtime'].refresh(ui)
-                ui.IDs['songtime'].resetcords(ui)
+                ui.IDs['songtime'].refresh()
+                ui.IDs['songtime'].resetcords()
     def refreshsongdisplays(self):
         if self.activesong != -1 and 'song duration' in ui.IDs:
             ui.IDs['song duration'].maxp = self.songlength
-            ui.IDs['songlength'].text = sectostr(self.songlength)
-            ui.IDs['songlength'].refresh(ui)
-            ui.IDs['songlength'].resetcords(ui)
-            ui.IDs['song title'].text = self.songdata[self.allsongs.index(self.activesong)]['name']
-            ui.IDs['song title'].refresh(ui)
-            ui.IDs['song title'].resetcords(ui)
-            ui.IDs['artist name'].text = self.songdata[self.allsongs.index(self.activesong)]['artist']
-            ui.IDs['artist name'].refresh(ui)
-            ui.IDs['artist name'].resetcords(ui)
+            ui.IDs['songlength'].settext(sectostr(self.songlength))
+            ui.IDs['song title'].settext(self.songdata[self.allsongs.index(self.activesong)]['name'])
+            ui.IDs['artist name'].settext(self.songdata[self.allsongs.index(self.activesong)]['artist'])
             ui.IDs['song img'].textsize = 70
             if self.songdata[self.allsongs.index(self.activesong)]['image_path'] != 'none':
                 ui.IDs['song img'].img = pygame.image.load(self.songdata[self.allsongs.index(self.activesong)]['image_path'])
@@ -456,8 +450,7 @@ class MUSIC:
                 ui.IDs['song img'].img = logo
                 ui.IDs['song img'].colorkey = (0,0,0)
                 ui.IDs['song img'].textsize = 58
-            ui.IDs['song img'].refresh(ui)
-            ui.IDs['song img'].resetcords(ui)
+            ui.IDs['song img'].refresh()
             
     def makegui(self):
         self.songbarwidth = 0.4
@@ -603,7 +596,7 @@ class MUSIC:
             self.refreshsongtable()
     def shiftsongtable(self):
         ui.IDs['playlist'].y = 100-ui.IDs['scroller'].scroll
-        ui.IDs['playlist'].refreshcords(ui)
+        ui.IDs['playlist'].refreshcords()
     def refreshsongtable(self,thread=True,scroller=True):
         if thread:
             if not 'songs refresh' in self.awaitingthreads:
@@ -626,7 +619,7 @@ class MUSIC:
         else: temphistory = self.songhistory[:30]
         self.playlists[2] = [temphistory,self.playlists[2][1]]
         ui.IDs['playlist'].disable()
-        ui.IDs['playlist'].wipe(ui,False)
+        ui.IDs['playlist'].wipe(False)
         data = []
         for a in self.playlists[self.activeplaylist][0]:
             if os.path.isfile(a):
@@ -645,16 +638,16 @@ class MUSIC:
                     else: img = ui.maketext(-100,-100,'',txtsize,img=image,col=(62,63,75),roundedcorners=4,textcenter=True,scalesize=False,enabled=False)
                 data.append([img,dat['name']+'\n{"- '+dat['artist']+'" (150,150,160)}',dat['album'],sectostr(float(dat['length'])),obj])
         ui.IDs['playlist'].data = data
-        ui.IDs['playlist'].refresh(ui)
+        ui.IDs['playlist'].refresh()
         if scroller:
             ui.IDs['scroller'].scroller = 0
             ui.IDs['scroller'].maxp = ui.IDs['playlist'].height
-            ui.IDs['scroller'].refresh(ui)
+            ui.IDs['scroller'].refresh()
             self.shiftsongtable()
         if 'songs refresh' in self.awaitingthreads:
             self.awaitingthreads['songs refresh'][0] = True
     def refreshplaylisttable(self):
-        ui.IDs['playlist table'].wipe(ui)
+        ui.IDs['playlist table'].wipe()
         data = []
         for a in self.playlists:
             name = a[1].removesuffix('.plst')
@@ -662,8 +655,8 @@ class MUSIC:
                 func = funcerpl(self.playlists.index(a),self)
                 data.append([ui.makebutton(0,0,a[1],25,clickdownsize=1,roundedcorners=4,verticalspacing=4,command=func.func,maxwidth=130)])
         ui.IDs['playlist table'].data = data
-        ui.IDs['playlist table'].refresh(ui)
-        ui.IDs['playlist table'].refreshcords(ui)
+        ui.IDs['playlist table'].refresh()
+        ui.IDs['playlist table'].refreshcords()
     def importplaylist(self):
         ID = 'import playlist'
         if not (ID in self.awaitingthreads):
@@ -699,12 +692,8 @@ class MUSIC:
             self.refreshsongtable(scroller=True)
             self.refreshplaylistdisplay()
     def refreshplaylistdisplay(self):
-        ui.IDs['playlist name'].text = self.playlists[self.activeplaylist][1]
-        ui.IDs['playlist name'].refresh(ui)
-        ui.IDs['playlist name'].resetcords(ui)
-        ui.IDs['playlist info'].text = str(len(self.playlists[self.activeplaylist][0]))+' songs'
-        ui.IDs['playlist info'].refresh(ui)
-        ui.IDs['playlist info'].resetcords(ui)
+        ui.IDs['playlist name'].settext(self.playlists[self.activeplaylist][1])
+        ui.IDs['playlist info'].settext(str(len(self.playlists[self.activeplaylist][0]))+' songs')
     def addtoplaylist(self,playlist,song=-1):
         back = False
         if song == -1:
@@ -748,16 +737,11 @@ class MUSIC:
         ui.movemenu('control','down')
     def infomenu(self):
         dat = self.songdata[self.allsongs.index(self.selected)]
-        ui.IDs['inputinfo name'].text = dat['name']
-        ui.IDs['inputinfo artist'].text = dat['artist']
-        ui.IDs['inputinfo album'].text = dat['album']
-        ui.IDs['inputinfo image'].text = dat['image_path']
-        ui.IDs['inputinfo mp3'].text = dat['mp3_path']
-        ui.IDs['inputinfo name'].refresh(ui)
-        ui.IDs['inputinfo artist'].refresh(ui)
-        ui.IDs['inputinfo album'].refresh(ui)
-        ui.IDs['inputinfo image'].refresh(ui)
-        ui.IDs['inputinfo mp3'].refresh(ui)
+        ui.IDs['inputinfo name'].settext(dat['name'])
+        ui.IDs['inputinfo artist'].settext(dat['artist'])
+        ui.IDs['inputinfo album'].settext(dat['album'])
+        ui.IDs['inputinfo image'].settext(dat['image_path'])
+        ui.IDs['inputinfo mp3'].settext(dat['mp3_path'])
         ui.movemenu('song info','up')
     def addmenu(self,download=False):
         data = []
@@ -766,14 +750,13 @@ class MUSIC:
                 func = funceram(self.playlists[a][1],self)
                 data.append([ui.makebutton(0,0,self.playlists[a][1],25,clickdownsize=1,roundedcorners=4,verticalspacing=4,command=func.func)])
         ui.IDs['playlist add'].data = data
-        ui.IDs['playlist add'].refresh(ui)
-        ui.IDs['playlist add'].refreshcords(ui)
+        ui.IDs['playlist add'].refresh()
+        ui.IDs['playlist add'].refreshcords()
         ui.IDs['add menu'].height = ui.IDs['playlist add'].height+10
         ui.movemenu('add menu','up')
     def plsteditmenu(self):
         if self.activeplaylist>2:
-            ui.IDs['inputinfo plstname'].text = self.playlists[self.activeplaylist][1]
-            ui.IDs['inputinfo plstname'].refresh(ui)
+            ui.IDs['inputinfo plstname'].settext(self.playlists[self.activeplaylist][1])
             ui.movemenu('plstedit menu','down')
     def deleteplst(self):
         ui.IDs['inputinfo plstname'].text = self.playlists[self.activeplaylist][1]+'%del%'
@@ -847,19 +830,16 @@ class MUSIC:
     def downloadsong(self):
         info = self.songdata[self.allsongs.index(self.selected)]
         ui.movemenu('download new','down')
-        ui.IDs['search bar'].text = asciify(info['name']+' - '+info['artist'])
-        ui.IDs['search bar'].refresh(ui)
+        ui.IDs['search bar'].settext(asciify(info['name']+' - '+info['artist']))
         self.searchyoutube()
     def downloadplaylist(self):
         count = len([1 for a in self.playlists[self.activeplaylist][0] if not self.songdata[self.allsongs.index(a)]['downloaded']])
-        ui.IDs['download playlist text'].text = f'{count} Songs from playlist?'
-        ui.IDs['download playlist text'].refresh(ui)
+        ui.IDs['download playlist text'].settext(f'{count} Songs from playlist?')
         ui.movemenu('download playlist','down')
     def downloadnew(self):
         ui.movemenu('download new','down')
     def clearsearch(self):
-        ui.IDs['search bar'].text = ''
-        ui.IDs['search bar'].refresh(ui)
+        ui.IDs['search bar'].settext('')
     def searchyoutube(self):
         if not('youtube search' in self.awaitingthreads):
             self.awaitingthreads['youtube search'] = [False,pyui.emptyfunction]
@@ -875,8 +855,8 @@ class MUSIC:
                 rem.append(links[a])
         for b in rem:
             links.remove(b)
-        ui.IDs['search table'].wipe(ui,False)
-        ui.IDs['search table'].refresh(ui)
+        ui.IDs['search table'].wipe(False)
+        ui.IDs['search table'].refresh()
         a = 0
         while len(ui.IDs['search table'].data)<min(5,len(links)):
             dat = BeautifulSoup(requests.get(f'https://www.youtube.com/watch?v={links[a]}').text,'html.parser')
@@ -887,7 +867,7 @@ class MUSIC:
                 thumbnail = 'thumbnail'+str(random.randint(0,100000000))
                 loadimage(f'http://img.youtube.com/vi/{links[a]}/0.jpg',thumbnail,True)
                 textobj = ui.maketext(-100,-100,'',78,img=pygame.image.load(pyui.resourcepath(f'data\\thumbnails\\{thumbnail}.png')),backingcol=(6,64,75))
-                ui.IDs['search table'].row_append(ui,[textobj,title,obj])
+                ui.IDs['search table'].row_append([textobj,title,obj])
             a+=1        
         self.awaitingthreads['youtube search'][0] = True
     def downloadyoutube(self,url,name):
@@ -914,20 +894,20 @@ while not done:
         if event.type == pygame.VIDEORESIZE:
             screenw = event.w
             screenh = event.h
-            ui.IDs['controlbar'].width = screenw
-            ui.IDs['playlists spliter'].height = screenh
-            ui.IDs['title backing'].width = screenw
-            ui.IDs['song duration'].width = event.w*music.songbarwidth
-            ui.IDs['song duration'].resetcords(ui)
-            ui.IDs['scroller'].height = screenh-193
+            ui.IDs['controlbar'].setwidth(screenw)
+            ui.IDs['playlists spliter'].setheight(screenh)
+            ui.IDs['title backing'].setwidth(screenw)
+            ui.IDs['song duration'].setwidth(event.w*music.songbarwidth)
+            ui.IDs['song duration'].resetcords()
+            ui.IDs['scroller'].setheight(screenh-193)
             ui.IDs['scroller'].pageheight = screenh-200
-            ui.IDs['scroller'].refresh(ui)
+            ui.IDs['scroller'].refresh()
             wid = int((screenw-315-12)/3)
             ui.IDs['playlist'].startboxwidth = [70,wid,wid,wid,70]
             ui.IDs['playlist'].boxwidth = [70,wid,wid,wid,70]
             ui.IDs['playlist'].clickablerect = pygame.Rect(160,100,4000,screenh-193)
-            ui.IDs['playlist'].gettablewidths(ui)
-            ui.IDs['playlist'].refreshcords(ui)
+            ui.IDs['playlist'].gettablewidths()
+            ui.IDs['playlist'].refreshcords()
         if event.type == pygame.mixer.music.get_endevent():
             music.nextsong()
         if event.type == pygame.KEYDOWN:
