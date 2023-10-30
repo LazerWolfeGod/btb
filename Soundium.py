@@ -23,7 +23,7 @@ pygame.display.set_icon(logow)
 screen = pygame.display.set_mode((screenw, screenh),pygame.RESIZABLE)
 pygame.display.set_caption('Soundium')
 pygame.scrap.init()
-ui = pyui.UI()
+ui = pyui.UI(PyUItitle=False)
 done = False    
 clock = pygame.time.Clock()
 ui.styleset(col=(16,163,127),textcol=(255,255,255),animantionspeed=20)
@@ -573,7 +573,6 @@ class MUSIC:
         else:
             pygame.mixer.music.pause()
     def playselected(self,selected=''):
-        print('play')
         ui.IDs['playpause button'].toggle = True
         if selected=='':
             ui.menuback()
@@ -641,7 +640,7 @@ class MUSIC:
         ui.IDs['playlist'].refresh()
         if scroller:
             ui.IDs['scroller'].scroller = 0
-            ui.IDs['scroller'].maxp = ui.IDs['playlist'].height
+            ui.IDs['scroller'].setmaxp(ui.IDs['playlist'].height)
             ui.IDs['scroller'].refresh()
             self.shiftsongtable()
         if 'songs refresh' in self.awaitingthreads:
