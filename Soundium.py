@@ -486,7 +486,7 @@ class MUSIC:
         wid = '(w-315-12)/3'
         ui.maketable(160,100,[],titles,ID='playlist',boxwidth=[70,wid,wid,wid,70],boxheight=[40],backingdraw=True,
                      textsize=20,verticalspacing=4,textcenter=False,col=(62,63,75),scalesize=False,scalex=False,
-                     scaley=False,roundedcorners=4,clickablerect=(0,0,'w','h-100'),guessheight=70,refreshbind=['scroller'])
+                     scaley=False,roundedcorners=4,clickablerect=(0,0,'w','ui.screenh-193'),guessheight=70,refreshbind=['scroller'])
         self.refreshsongtable(False,False)
         ui.makerect(156,0,3000,100,col=(62,63,75),scalesize=False,scalex=False,scaley=False,layer=2,ID='title backing')
         ui.maketext(0,0,self.playlists[self.activeplaylist][1],80,anchor=('(w-175)/2+160',36),center=True,scalesize=False,scalex=False,scaley=False,ID='playlist name',layer=3,backingcol=(62,63,75))
