@@ -22,8 +22,8 @@ logow.set_colorkey((255,255,255))
 pygame.display.set_icon(logow)
 screen = pygame.display.set_mode((screenw, screenh),pygame.RESIZABLE)
 pygame.display.set_caption('Soundium')
-pygame.scrap.init()
-ui = pyui.UI(PyUItitle=False)
+pygame.scrap.init(1,False)
+ui = pyui.UI()
 done = False    
 clock = pygame.time.Clock()
 ui.styleset(col=(16,163,127),textcol=(255,255,255),animantionspeed=20)
@@ -483,13 +483,15 @@ class MUSIC:
                   ui.maketext(0,0,'Song',30,textcenter=True,col=(62,63,75)),
                   ui.maketext(0,0,'Album',30,textcenter=True,col=(62,63,75)),
                   ui.maketext(0,0,'Length',30,textcenter=True,col=(62,63,75)),'']
-        wid = int((screenw-315-12)/3)
-        ui.maketable(160,100,[],titles,ID='playlist',boxwidth=[70,wid,wid,wid,70],boxheight=[40],backingdraw=True,textsize=20,verticalspacing=4,textcenter=False,col=(62,63,75),scalesize=False,scalex=False,scaley=False,roundedcorners=4,clickablerect=pygame.Rect(160,100,4000,screenh-193),guessheight=70)
+        wid = '(w-315-12)/3'
+        ui.maketable(160,100,[],titles,ID='playlist',boxwidth=[70,wid,wid,wid,70],boxheight=[40],backingdraw=True,
+                     textsize=20,verticalspacing=4,textcenter=False,col=(62,63,75),scalesize=False,scalex=False,
+                     scaley=False,roundedcorners=4,clickablerect=(0,0,'w','h-100'),guessheight=70,refreshbind=['scroller'])
         self.refreshsongtable(False,False)
         ui.makerect(156,0,3000,100,col=(62,63,75),scalesize=False,scalex=False,scaley=False,layer=2,ID='title backing')
         ui.maketext(0,0,self.playlists[self.activeplaylist][1],80,anchor=('(w-175)/2+160',36),center=True,scalesize=False,scalex=False,scaley=False,ID='playlist name',layer=3,backingcol=(62,63,75))
         ui.maketext(0,65,str(len(self.playlists[self.activeplaylist][0]))+' songs',30,anchor=('(w-175)/2+160',0),center=True,centery=False,scalesize=False,scalex=False,scaley=False,ID='playlist info',layer=3,backingcol=(62,63,75))
-        ui.makescroller(0,0,screenh-193,self.shiftsongtable,maxp=ui.IDs['playlist'].height,pageheight=screenh-200,anchor=('w',100),objanchor=('w',0),ID='scroller',scalesize=False,scalex=False,scaley=False,runcommandat=1)
+        ui.makescroller(0,0,screenh-193,self.shiftsongtable,maxp="ui.IDs['playlist'].height",pageheight=screenh-200,anchor=('w',100),objanchor=('w',0),ID='scroller',scalesize=False,scalex=False,scaley=False,runcommandat=1)
             
         ## side bar
         ui.makerect(150,0,4,1000,layer=2,scalesize=False,scalex=False,scaley=False,ID='playlists spliter')
@@ -573,6 +575,7 @@ class MUSIC:
         else:
             pygame.mixer.music.pause()
     def playselected(self,selected=''):
+        print('play')
         ui.IDs['playpause button'].toggle = True
         if selected=='':
             ui.menuback()
@@ -640,8 +643,6 @@ class MUSIC:
         ui.IDs['playlist'].refresh()
         if scroller:
             ui.IDs['scroller'].scroller = 0
-            ui.IDs['scroller'].setmaxp(ui.IDs['playlist'].height)
-            ui.IDs['scroller'].refresh()
             self.shiftsongtable()
         if 'songs refresh' in self.awaitingthreads:
             self.awaitingthreads['songs refresh'][0] = True
@@ -898,15 +899,6 @@ while not done:
             ui.IDs['title backing'].setwidth(screenw)
             ui.IDs['song duration'].setwidth(event.w*music.songbarwidth)
             ui.IDs['song duration'].resetcords()
-            ui.IDs['scroller'].setheight(screenh-193)
-            ui.IDs['scroller'].pageheight = screenh-200
-            ui.IDs['scroller'].refresh()
-            wid = int((screenw-315-12)/3)
-            ui.IDs['playlist'].startboxwidth = [70,wid,wid,wid,70]
-            ui.IDs['playlist'].boxwidth = [70,wid,wid,wid,70]
-            ui.IDs['playlist'].clickablerect = pygame.Rect(160,100,4000,screenh-193)
-            ui.IDs['playlist'].gettablewidths()
-            ui.IDs['playlist'].refreshcords()
         if event.type == pygame.mixer.music.get_endevent():
             music.nextsong()
         if event.type == pygame.KEYDOWN:
