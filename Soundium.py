@@ -22,8 +22,8 @@ logow.set_colorkey((255,255,255))
 pygame.display.set_icon(logow)
 screen = pygame.display.set_mode((screenw, screenh),pygame.RESIZABLE)
 pygame.display.set_caption('Soundium')
-pygame.scrap.init(1,False)
-ui = pyui.UI()
+pygame.scrap.init()
+ui = pyui.UI(1,False)
 done = False    
 clock = pygame.time.Clock()
 ui.styleset(col=(16,163,127),textcol=(255,255,255),animantionspeed=20)
@@ -491,7 +491,7 @@ class MUSIC:
         ui.makerect(156,0,3000,100,col=(62,63,75),scalesize=False,scalex=False,scaley=False,layer=2,ID='title backing')
         ui.maketext(0,0,self.playlists[self.activeplaylist][1],80,anchor=('(w-175)/2+160',36),center=True,scalesize=False,scalex=False,scaley=False,ID='playlist name',layer=3,backingcol=(62,63,75))
         ui.maketext(0,65,str(len(self.playlists[self.activeplaylist][0]))+' songs',30,anchor=('(w-175)/2+160',0),center=True,centery=False,scalesize=False,scalex=False,scaley=False,ID='playlist info',layer=3,backingcol=(62,63,75))
-        ui.makescroller(0,0,screenh-193,self.shiftsongtable,maxp="ui.IDs['playlist'].height",pageheight=screenh-200,anchor=('w',100),objanchor=('w',0),ID='scroller',scalesize=False,scalex=False,scaley=False,runcommandat=1)
+        ui.makescroller(0,0,'h-193',self.shiftsongtable,maxp="ui.IDs['playlist'].height",pageheight='h-198',anchor=('w',100),objanchor=('w',0),ID='scroller',scalesize=False,scalex=False,scaley=False,runcommandat=1)
             
         ## side bar
         ui.makerect(150,0,4,1000,layer=2,scalesize=False,scalex=False,scaley=False,ID='playlists spliter')
