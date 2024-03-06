@@ -52,7 +52,7 @@ def makefileable(name):
         else:
             nstring+=a
     
-    special = '\/:*?"<>|'
+    special = '\\/:*?"<>|'
     for a in special:
         nstring = nstring.replace(a,'')
     return nstring
@@ -575,7 +575,6 @@ class MUSIC:
         else:
             pygame.mixer.music.pause()
     def playselected(self,selected=''):
-        print('play')
         ui.IDs['playpause button'].toggle = True
         if selected=='':
             ui.menuback()
@@ -630,7 +629,7 @@ class MUSIC:
                 dat = self.songdata[self.allsongs.index(a)]
                 func = funcerps(a,self)
                 if dat['image_path'] == 'none':
-                    if dat['downloaded']: img = ui.makebutton(-100,-100,'',37,command=func.func,col=(62,63,75),img=logo,roundedcorners=4,scalesize=False,enabled=False,border=1,hovercol=pyui.shiftcolor((72,63,75),-5),verticalspacing=3)
+                    if dat['downloaded']: img = ui.makebutton(-100,-100,'',37,command=func.func,col=(62,63,75),img=logo,colorkey=(0,0,0),roundedcorners=4,scalesize=False,enabled=False,border=1,hovercol=pyui.shiftcolor((72,63,75),-5),verticalspacing=3)
                     else: img = ui.maketext(-100,-100,'-',20,col=(62,63,75),roundedcorners=4,textcenter=True,scalesize=False,enabled=False)
                 else:
                     image = pygame.image.load(dat['image_path'])
